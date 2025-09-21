@@ -1,6 +1,6 @@
 # 🚀 AWS CloudOps Agent
 
-A beginner-friendly AWS operations agent built with AWS Strands Agent SDK and Claude 3.5 Sonnet.
+A beginner-friendly AWS operations agent built with AWS Strands Agent SDK and  Amazon Bedrock Claude 4 Sonnet.
 
 ## ✨ Features
 
