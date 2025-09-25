@@ -1,0 +1,39 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'DynamoDB table for AWS CloudOps Agent RAG system'
+
+Parameters:
+  TableName:
+    Type: String
+    Default: aws-cloudops-knowledge
+    Description: Name of the DynamoDB table for knowledge storage
+
+Resources:
+  KnowledgeTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref TableName
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      Tags:
+        - Key: Purpose
+          Value: RAG-KnowledgeBase
+        - Key: Application
+          Value: AWS-CloudOps-Agent
+
+Outputs:
+  TableName:
+    Description: Name of the created DynamoDB table
+    Value: !Ref KnowledgeTable
+    Export:
+      Name: !Sub "${AWS::StackName}-TableName"
+  
+  TableArn:
+    Description: ARN of the created DynamoDB table
+    Value: !GetAtt KnowledgeTable.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-TableArn"
