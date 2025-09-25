@@ -8,7 +8,12 @@ A beginner-friendly AWS operations agent built with AWS Strands Agent SDK and  A
 - 🏗️ **Architecture Design**: Get architecture recommendations based on your scenarios
 - 💡 **Best Practices**: Receive AWS best practices and security recommendations
 - 🔍 **Troubleshooting**: Get help with AWS-related issues
+- 🧠 **RAG System**: Enhanced responses using DynamoDB-powered knowledge retrieval
 - 🎨 **User-Friendly Interface**: Rich console interface with emojis and visual indicators
+
+## 🏛️ Initial Architecture
+
+![AWS CloudOps Agent Architecture](docs/aws-strands-agent.drawio.svg)
 
 ## 🛠️ Setup
 
@@ -24,12 +29,18 @@ A beginner-friendly AWS operations agent built with AWS Strands Agent SDK and  A
 cd C:\Workspace\AwsCloudOpsAgent
 ```
 
-2. Install dependencies (already done if you followed the setup):
+2. Install dependencies:
 ```bash
-uv add strands-agents strands-agents-tools boto3 rich
+uv add strands-agents strands-agents-tools boto3 rich sentence-transformers numpy
 ```
 
-3. Configure AWS credentials:
+3. Deploy DynamoDB table:
+```bash
+cd inf
+aws cloudformation deploy --template-file dynamodb-rag.yaml --stack-name aws-cloudops-rag-stack
+```
+
+4. Configure AWS credentials:
 ```bash
 aws configure
 ```
@@ -61,6 +72,12 @@ You: What's the best way to store user data securely?
 Agent: 🔒 For secure user data storage, consider these options...
 ```
 
+**Knowledge-Enhanced Responses:**
+```
+You: How do I make my EC2 instances highly available?
+Agent: 🧠 Based on AWS best practices: Use Auto Scaling Groups...
+```
+
 ## 🔧 Configuration
 
 The agent uses your default AWS CLI profile. To use a different profile:
@@ -69,13 +86,26 @@ The agent uses your default AWS CLI profile. To use a different profile:
 agent = AwsCloudOpsAgent(aws_profile="your-profile-name")
 ```
 
+### RAG System
+
+The agent includes a RAG (Retrieval-Augmented Generation) system that:
+- Stores AWS knowledge in DynamoDB with semantic embeddings
+- Retrieves relevant context for enhanced responses
+- Costs <$0.001/month for typical usage
+- Auto-populates with AWS best practices
+
 ## 📁 Project Structure
 
 ```
 AwsCloudOpsAgent/
 ├── src/
-│   └── aws_cloudops_agent.py    # Main agent implementation
+│   ├── aws_cloudops_agent.py    # Main agent implementation
+│   └── rag_system.py           # RAG system with DynamoDB
+├── inf/
+│   ├── dynamodb-rag.yaml       # CloudFormation template
+│   └── deploy.sh               # Deployment script
 ├── run_agent.py                 # Entry point
+├── requirements.txt             # Dependencies
 ├── README.md                    # This file
 └── pyproject.toml              # Project configuration
 ```
