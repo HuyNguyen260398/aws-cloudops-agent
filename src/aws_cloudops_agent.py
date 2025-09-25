@@ -10,6 +10,7 @@ from rich.text import Text
 from strands import Agent
 from strands.models import BedrockModel
 from strands_tools import use_aws
+from .rag_system import DynamoRAG
 
 console = Console()
 
@@ -17,6 +18,9 @@ class AwsCloudOpsAgent:
     def __init__(self, aws_profile: str = "default"):
         """Initialize the AWS CloudOps Agent"""
         self.aws_profile = aws_profile
+        
+        # Initialize RAG system
+        self.rag = DynamoRAG(aws_profile=aws_profile)
         
         # Initialize Bedrock model with Claude 4 Sonnet
         self.model = BedrockModel(
@@ -56,12 +60,31 @@ class AwsCloudOpsAgent:
         - End with helpful next steps or recommendations
         """
     
+    def setup_knowledge_base(self):
+        """Setup initial knowledge base with AWS best practices"""
+        knowledge_items = [
+            ("Use Auto Scaling Groups for EC2 instances to ensure high availability and automatic scaling based on demand.", "ec2"),
+            ("Store sensitive data in AWS Secrets Manager or Parameter Store instead of hardcoding in applications.", "security"),
+            ("Use CloudFront CDN to improve performance and reduce latency for global users.", "performance"),
+            ("Enable VPC Flow Logs for network monitoring and security analysis.", "networking"),
+            ("Use RDS Multi-AZ deployments for database high availability.", "database")
+        ]
+        
+        for content, category in knowledge_items:
+            self.rag.add_knowledge(content, category)
+    
     async def chat(self, message: str) -> str:
         """Process user message and return response"""
         try:
             # Show thinking indicator
             with console.status("[bold green]🤔 Thinking about your AWS question..."):
-                response = await self.agent(message)
+                # Get relevant context from RAG
+                context = self.rag.get_context(message)
+                
+                # Combine context with user message
+                enhanced_message = f"{context}\n\nUser Question: {message}" if context else message
+                
+                response = await self.agent(enhanced_message)
             
             return response
             
@@ -92,6 +115,12 @@ class AwsCloudOpsAgent:
 async def main():
     """Main interactive loop"""
     agent = AwsCloudOpsAgent()
+    
+    # Setup RAG system
+    console.print("[yellow]🔧 Setting up knowledge base...[/yellow]")
+    agent.rag.create_table()
+    agent.setup_knowledge_base()
+    
     agent.display_welcome()
     
     console.print("\n[bold yellow]💡 Tip: Type 'quit' or 'exit' to end the session[/bold yellow]\n")
