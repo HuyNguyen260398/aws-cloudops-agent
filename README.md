@@ -18,6 +18,7 @@ A beginner-friendly AWS operations agent built with AWS Strands Agent SDK and  A
 ## 🛠️ Setup
 
 ### Prerequisites
+
 - Python 3.11+
 - AWS CLI configured with appropriate credentials
 - uv package manager
@@ -25,22 +26,26 @@ A beginner-friendly AWS operations agent built with AWS Strands Agent SDK and  A
 ### Installation
 
 1. Clone or navigate to the project directory:
+
 ```bash
 cd C:\Workspace\AwsCloudOpsAgent
 ```
 
 2. Install dependencies:
+
 ```bash
 uv add strands-agents strands-agents-tools boto3 rich sentence-transformers numpy
 ```
 
 3. Deploy DynamoDB table:
+
 ```bash
 cd inf
 aws cloudformation deploy --template-file dynamodb-rag.yaml --stack-name aws-cloudops-rag-stack
 ```
 
 4. Configure AWS credentials:
+
 ```bash
 aws configure
 ```
@@ -48,6 +53,7 @@ aws configure
 ## 🚀 Usage
 
 Run the agent:
+
 ```bash
 uv run python run_agent.py
 ```
@@ -55,25 +61,29 @@ uv run python run_agent.py
 ### Example Interactions
 
 **Resource Discovery:**
-```
+
+```sh
 You: Show me my EC2 instances
 Agent: 📊 Here are your EC2 instances...
 ```
 
 **Architecture Design:**
-```
+
+```ini
 You: Design a web app architecture for high availability
 Agent: 🏗️ For a highly available web application, I recommend...
 ```
 
 **Best Practices:**
-```
+
+```yaml
 You: What's the best way to store user data securely?
 Agent: 🔒 For secure user data storage, consider these options...
 ```
 
 **Knowledge-Enhanced Responses:**
-```
+
+```ini
 You: How do I make my EC2 instances highly available?
 Agent: 🧠 Based on AWS best practices: Use Auto Scaling Groups...
 ```
@@ -89,6 +99,7 @@ agent = AwsCloudOpsAgent(aws_profile="your-profile-name")
 ### RAG System
 
 The agent includes a RAG (Retrieval-Augmented Generation) system that:
+
 - Stores AWS knowledge in DynamoDB with semantic embeddings
 - Retrieves relevant context for enhanced responses
 - Costs <$0.001/month for typical usage
@@ -96,7 +107,7 @@ The agent includes a RAG (Retrieval-Augmented Generation) system that:
 
 ## 📁 Project Structure
 
-```
+```ini
 AwsCloudOpsAgent/
 ├── src/
 │   ├── aws_cloudops_agent.py    # Main agent implementation
