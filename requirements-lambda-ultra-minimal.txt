@@ -1,0 +1,8 @@
+# Ultra minimal Lambda deployment requirements
+# Only basic AWS and logging functionality
+
+# Core AWS SDK
+boto3>=1.40.35
+
+# Basic request handling
+# No AI/ML dependencies to ensure compatibility

@@ -1,0 +1,14 @@
+# Lambda deployment requirements
+# Core dependencies for AWS CloudOps Agent
+
+# AWS and Strands Agent SDK
+strands-agents>=1.9.1
+strands-agents-tools>=0.2.8
+boto3>=1.40.35
+
+# Text processing and embeddings
+sentence-transformers>=5.1.1
+numpy>=2.3.3
+
+# Note: rich is excluded for Lambda as it's mainly for console formatting
+# For Lambda deployment, we'll use basic logging instead of rich console output

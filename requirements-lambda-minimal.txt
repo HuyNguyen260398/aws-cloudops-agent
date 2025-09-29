@@ -1,0 +1,16 @@
+# Minimal Lambda deployment requirements
+# Core dependencies for AWS CloudOps Agent (without heavy ML libraries)
+
+# AWS and Strands Agent SDK
+strands-agents>=1.9.1
+strands-agents-tools>=0.2.8
+boto3>=1.40.35
+
+# Ensure compatible pydantic version
+pydantic>=2.0.0
+
+# Basic math/array operations (much lighter than full sentence-transformers)
+numpy>=2.3.3
+
+# Note: sentence-transformers is excluded as it's very large (~400MB)
+# For production, consider using AWS SageMaker endpoints or smaller embedding models

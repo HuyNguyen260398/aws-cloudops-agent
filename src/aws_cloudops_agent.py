@@ -1,8 +1,6 @@
 """
 AWS CloudOps Agent - A beginner-friendly agent for AWS operations
 """
-import re
-from typing import Dict, Any, List
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
