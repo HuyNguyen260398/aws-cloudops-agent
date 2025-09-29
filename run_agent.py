@@ -7,7 +7,6 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 
 from aws_cloudops_agent import main
-import asyncio
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

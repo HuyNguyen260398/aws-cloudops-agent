@@ -2,5 +2,3 @@ strands-agents
 strands-agents-tools
 boto3
 rich
-sentence-transformers
-numpy

@@ -1,7 +1,6 @@
 """
 AWS CloudOps Agent - A beginner-friendly agent for AWS operations
 """
-import asyncio
 import re
 from typing import Dict, Any, List
 from rich.console import Console
@@ -10,7 +9,6 @@ from rich.text import Text
 from strands import Agent
 from strands.models import BedrockModel
 from strands_tools import use_aws
-from .rag_system import DynamoRAG
 
 console = Console()
 
@@ -19,13 +17,10 @@ class AwsCloudOpsAgent:
         """Initialize the AWS CloudOps Agent"""
         self.aws_profile = aws_profile
         
-        # Initialize RAG system
-        self.rag = DynamoRAG(aws_profile=aws_profile)
-        
         # Initialize Bedrock model with Claude 4 Sonnet
         self.model = BedrockModel(
             model_id="apac.anthropic.claude-sonnet-4-20250514-v1:0",
-            aws_profile=aws_profile
+            # aws_profile=aws_profile
         )
         
         # Initialize the agent with AWS tools
@@ -59,34 +54,21 @@ class AwsCloudOpsAgent:
         - Include practical examples when possible
         - End with helpful next steps or recommendations
         """
-    
-    def setup_knowledge_base(self):
-        """Setup initial knowledge base with AWS best practices"""
-        knowledge_items = [
-            ("Use Auto Scaling Groups for EC2 instances to ensure high availability and automatic scaling based on demand.", "ec2"),
-            ("Store sensitive data in AWS Secrets Manager or Parameter Store instead of hardcoding in applications.", "security"),
-            ("Use CloudFront CDN to improve performance and reduce latency for global users.", "performance"),
-            ("Enable VPC Flow Logs for network monitoring and security analysis.", "networking"),
-            ("Use RDS Multi-AZ deployments for database high availability.", "database")
-        ]
-        
-        for content, category in knowledge_items:
-            self.rag.add_knowledge(content, category)
-    
-    async def chat(self, message: str) -> str:
+
+    def chat(self, message: str) -> str:
         """Process user message and return response"""
         try:
             # Show thinking indicator
             with console.status("[bold green]🤔 Thinking about your AWS question..."):
-                # Get relevant context from RAG
-                context = self.rag.get_context(message)
-                
-                # Combine context with user message
-                enhanced_message = f"{context}\n\nUser Question: {message}" if context else message
-                
-                response = await self.agent(enhanced_message)
+                result = self.agent(message)
             
-            return response
+            # Extract text content from the message
+            if hasattr(result, 'message') and 'content' in result.message:
+                content_blocks = result.message['content']
+                if content_blocks and isinstance(content_blocks, list):
+                    return content_blocks[0].get('text', str(result))
+            
+            return str(result)
             
         except Exception as e:
             return f"❌ Sorry, I encountered an error: {str(e)}"
@@ -112,15 +94,9 @@ class AwsCloudOpsAgent:
         """Display agent response with formatting"""
         console.print(Panel(response, title="🤖 AWS CloudOps Agent", border_style="green"))
 
-async def main():
+def main():
     """Main interactive loop"""
     agent = AwsCloudOpsAgent()
-    
-    # Setup RAG system
-    console.print("[yellow]🔧 Setting up knowledge base...[/yellow]")
-    agent.rag.create_table()
-    agent.setup_knowledge_base()
-    
     agent.display_welcome()
     
     console.print("\n[bold yellow]💡 Tip: Type 'quit' or 'exit' to end the session[/bold yellow]\n")
@@ -138,7 +114,7 @@ async def main():
                 continue
             
             # Get and display response
-            response = await agent.chat(user_input)
+            response = agent.chat(user_input)
             agent.display_response(response)
             
         except KeyboardInterrupt:
@@ -148,4 +124,4 @@ async def main():
             console.print(f"\n❌ Error: {str(e)}")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
