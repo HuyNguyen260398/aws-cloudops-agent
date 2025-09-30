@@ -1,0 +1,1 @@
+{"statusCode": 200, "headers": {"Content-Type": "application/json"}, "body": "{\"response\": \"\\u2705 AWS CloudOps Agent deployed successfully! Your message: Hello from AWS CloudOps Agent!\", \"timestamp\": \"0158d1f8-c294-41fe-90cd-868b5cbdd029\", \"status\": \"deployed\"}"}
