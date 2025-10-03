@@ -6,7 +6,11 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "boto3",
+    "fastapi>=0.118.0",
+    "httpx>=0.28.1",
+    "pydantic>=2.11.9",
     "rich",
     "strands-agents",
     "strands-agents-tools",
+    "uvicorn[standard]>=0.37.0",
 ]
