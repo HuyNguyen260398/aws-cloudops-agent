@@ -115,7 +115,7 @@ def main():
             
             # Get and display response
             response = agent.chat(user_input)
-            agent.display_response(response)
+            # agent.display_response(response)
             
         except KeyboardInterrupt:
             console.print("\n\n👋 Thanks for using AWS CloudOps Agent!")
