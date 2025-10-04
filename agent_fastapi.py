@@ -26,9 +26,16 @@ async def invoke_agent(request: InvocationRequest):
                 detail="No prompt found in input. Please provide a 'prompt' key in the input.",
             )
 
-        result = agent.chat(user_message)
+        # Collect all chunks from the async generator
+        result_chunks = []
+        async for chunk in agent.stream(user_message):
+            result_chunks.append(chunk)
+
+        # Join all chunks into a single message
+        result = "".join(result_chunks)
+
         response = {
-            "message": result.message,
+            "message": result,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "model": "strands-agent",
         }

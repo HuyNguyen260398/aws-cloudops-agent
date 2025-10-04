@@ -49,6 +49,17 @@ class AwsCloudOpsAgent:
             
         except Exception as e:
             return f"Sorry, I encountered an error: {str(e)}"
+        
+    async def stream(self, message: str):
+        """Process user message and return response"""
+        try:
+            async for event in self.agent.stream_async(message):
+                if "data" in event:
+                    # Only stream text chunks to the client
+                    yield event["data"]
+
+        except Exception as e:
+            yield f"Sorry, I encountered an error: {str(e)}"
 
 
 def main():
