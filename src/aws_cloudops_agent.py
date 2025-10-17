@@ -40,16 +40,16 @@ class AwsCloudOpsAgent:
         - Include practical examples when possible
         - End with helpful next steps or recommendations
         """
-    
+
     def chat(self, message: str):
         """Process user message and return response"""
         try:
             result = self.agent(message)
             return result
-            
+
         except Exception as e:
             return f"Sorry, I encountered an error: {str(e)}"
-        
+
     async def stream(self, message: str):
         """Process user message and return response"""
         try:
