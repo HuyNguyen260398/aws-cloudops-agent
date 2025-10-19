@@ -10,7 +10,7 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-cache
 
 # Copy agent file
-COPY agent_fastapi.py aws_cloudops_agent.py ./
+COPY src/agent_fastapi.py src/aws_cloudops_agent.py ./
 
 # Expose port
 EXPOSE 8080

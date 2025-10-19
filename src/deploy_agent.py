@@ -6,7 +6,7 @@ response = client.create_agent_runtime(
     agentRuntimeName="aws_cloudops_agent",
     agentRuntimeArtifact={
         "containerConfiguration": {
-            "containerUri": "010382427026.dkr.ecr.ap-southeast-2.amazonaws.com/aws-cloudops-agent:latest"
+            "containerUri": "010382427026.dkr.ecr.ap-southeast-1.amazonaws.com/aws-cloudops-agent:latest"
         }
     },
     networkConfiguration={"networkMode": "PUBLIC"},

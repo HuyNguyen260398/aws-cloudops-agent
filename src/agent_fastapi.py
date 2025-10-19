@@ -4,27 +4,46 @@ from fastapi.responses import StreamingResponse
 from typing import Dict, Any
 from datetime import datetime, timezone
 from aws_cloudops_agent import AwsCloudOpsAgent
+from strands import Agent
+import uuid
 
 app = FastAPI(title="Strands Agent Server", version="1.0.0")
-agent = AwsCloudOpsAgent()
+agent_sessions: Dict[str, Agent] = {}
 
 
 class InvocationRequest(BaseModel):
     input: Dict[str, Any]
+    session_id: str = None
 
 
 class InvocationResponse(BaseModel):
     output: Dict[str, Any]
+    session_id: str = None
 
 
 class PromptRequest(BaseModel):
     prompt: str
+    session_id: str = None
+
+
+def get_or_create_agent(session_id: str = None) -> tuple[Agent, str]:
+    """Get existing agent or create new one."""
+    if session_id and session_id in agent_sessions:
+        return agent_sessions[session_id], session_id
+
+    # Create new agent
+    new_session_id = str(uuid.uuid4())
+    agent = AwsCloudOpsAgent()
+    agent_sessions[new_session_id] = agent
+    return agent, new_session_id
 
 
 @app.post("/invocations", response_model=InvocationResponse)
 async def invoke_agent(request: InvocationRequest):
     try:
+        agent, session_id = get_or_create_agent(request.session_id)
         user_message = request.input.get("prompt", "")
+
         if not user_message:
             raise HTTPException(
                 status_code=400,
@@ -41,7 +60,7 @@ async def invoke_agent(request: InvocationRequest):
 
         response = {"message": result}
 
-        return InvocationResponse(output=response)
+        return InvocationResponse(output=response, session_id=session_id)
 
     except Exception as e:
         raise HTTPException(
@@ -53,6 +72,7 @@ async def invoke_agent(request: InvocationRequest):
 async def stream_response(request: PromptRequest):
     async def generate():
         try:
+            agent, session_id = get_or_create_agent(request.session_id)
             async for chunk in agent.stream(request.prompt):
                 yield chunk
         except Exception as e:
