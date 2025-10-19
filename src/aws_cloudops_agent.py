@@ -1,6 +1,6 @@
 from strands import Agent
 from strands.models import BedrockModel
-from strands_tools import use_aws
+from strands_tools import use_aws, handoff_to_user, http_request
 
 
 class AwsCloudOpsAgent:
@@ -14,8 +14,9 @@ class AwsCloudOpsAgent:
         # Initialize the agent with AWS tools
         self.agent = Agent(
             model=self.model,
-            tools=[use_aws],
+            tools=[use_aws, handoff_to_user, http_request],
             system_prompt=self._get_system_prompt(),
+            callback_handler=None,
         )
 
     def _get_system_prompt(self) -> str:
@@ -34,6 +35,7 @@ class AwsCloudOpsAgent:
         - When suggesting architectures, explain the reasoning behind service choices
         - Always consider cost-effectiveness and security best practices
         - Use the use_aws tool to interact with AWS services when needed
+        - Use the handoff_to_user prompt for user confirmation before executing any actions that modify resources
         
         Response format:
         - Use bullet points for clarity

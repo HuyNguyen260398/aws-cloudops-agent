@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from fastapi.responses import StreamingResponse
 from typing import Dict, Any
 from datetime import datetime, timezone
 from aws_cloudops_agent import AwsCloudOpsAgent
@@ -14,6 +15,10 @@ class InvocationRequest(BaseModel):
 
 class InvocationResponse(BaseModel):
     output: Dict[str, Any]
+
+
+class PromptRequest(BaseModel):
+    prompt: str
 
 
 @app.post("/invocations", response_model=InvocationResponse)
@@ -34,11 +39,7 @@ async def invoke_agent(request: InvocationRequest):
         # Join all chunks into a single message
         result = "".join(result_chunks)
 
-        response = {
-            "message": result,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "model": "strands-agent",
-        }
+        response = {"message": result}
 
         return InvocationResponse(output=response)
 
@@ -46,6 +47,18 @@ async def invoke_agent(request: InvocationRequest):
         raise HTTPException(
             status_code=500, detail=f"Agent processing failed: {str(e)}"
         )
+
+
+@app.post("/stream")
+async def stream_response(request: PromptRequest):
+    async def generate():
+        try:
+            async for chunk in agent.stream(request.prompt):
+                yield chunk
+        except Exception as e:
+            yield f"Error: {str(e)}"
+
+    return StreamingResponse(generate(), media_type="text/plain")
 
 
 @app.get("/ping")
