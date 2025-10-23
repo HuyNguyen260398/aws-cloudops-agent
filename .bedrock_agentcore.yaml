@@ -1,0 +1,31 @@
+default_agent: agent_streaming
+agents:
+  agent_streaming:
+    name: agent_streaming
+    entrypoint: src/agent_streaming.py
+    platform: linux/arm64
+    container_runtime: docker
+    aws:
+      execution_role: arn:aws:iam::010382427026:role/AgentRuntimeRole
+      execution_role_auto_create: true
+      account: 010382427026
+      region: ap-southeast-1
+      ecr_repository: 010382427026.dkr.ecr.ap-southeast-1.amazonaws.com/aws-cloudops-agent
+      ecr_auto_create: false
+      network_configuration:
+        network_mode: PUBLIC
+      protocol_configuration:
+        server_protocol: HTTP
+      observability:
+        enabled: true
+    bedrock_agentcore:
+      agent_id: null
+      agent_arn: null
+      agent_session_id: null
+    codebuild:
+      project_name: null
+      execution_role: null
+      source_bucket: null
+    authorizer_configuration: null
+    request_header_configuration: null
+    oauth_configuration: null
