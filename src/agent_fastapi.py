@@ -73,8 +73,9 @@ async def stream_response(request: PromptRequest):
     async def generate():
         try:
             agent, session_id = get_or_create_agent(request.session_id)
-            async for chunk in agent.stream(request.prompt):
-                yield chunk
+            async for event in agent.stream_async(request.prompt):
+                if "data" in event:
+                    yield event["data"]
         except Exception as e:
             yield f"Error: {str(e)}"
 
