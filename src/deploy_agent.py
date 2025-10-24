@@ -26,10 +26,10 @@ environment_variables = {
 
 response = client.update_agent_runtime(
     # agentRuntimeName="aws_cloudops_agent",
-    agentRuntimeId="aws_cloudops_agent-gnRdUh8WGO",
+    agentRuntimeId="",
     agentRuntimeArtifact={
         "containerConfiguration": {
-            "containerUri": "010382427026.dkr.ecr.ap-southeast-1.amazonaws.com/aws-cloudops-agent:latest"
+            "containerUri": ""
         }
     },
     networkConfiguration={"networkMode": "PUBLIC"},

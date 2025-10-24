@@ -3,17 +3,16 @@ from strands.models import BedrockModel
 from strands_tools import use_aws, handoff_to_user, http_request
 
 
-class AwsCloudOpsAgent:
+class AwsCloudOpsAgent(Agent):
     def __init__(self):
-
         # Initialize Bedrock model with Claude 4 Sonnet
-        self.model = BedrockModel(
+        model = BedrockModel(
             model_id="apac.anthropic.claude-sonnet-4-20250514-v1:0",
         )
 
-        # Initialize the agent with AWS tools
-        self.agent = Agent(
-            model=self.model,
+        # Initialize the parent Agent class
+        super().__init__(
+            model=model,
             tools=[use_aws, handoff_to_user, http_request],
             system_prompt=self._get_system_prompt(),
             callback_handler=None,
@@ -46,22 +45,9 @@ class AwsCloudOpsAgent:
     def chat(self, message: str):
         """Process user message and return response"""
         try:
-            result = self.agent(message)
-            return result
-
+            return self(message)
         except Exception as e:
             return f"Sorry, I encountered an error: {str(e)}"
-
-    async def stream(self, message: str):
-        """Process user message and return response"""
-        try:
-            async for event in self.agent.stream_async(message):
-                if "data" in event:
-                    # Only stream text chunks to the client
-                    yield event["data"]
-
-        except Exception as e:
-            yield f"Sorry, I encountered an error: {str(e)}"
 
 
 def main():
