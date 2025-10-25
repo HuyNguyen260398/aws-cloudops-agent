@@ -15,6 +15,7 @@ COPY config/static-config.yaml ./config/
 COPY config/dynamic-config.yaml ./config/
 
 COPY src/utils/config_manager.py ./utils/
+COPY src/utils/config_validator.py ./utils/
 COPY src/utils/config.py ./utils/
 COPY src/utils/mylogger.py ./utils/
 COPY src/utils/responses.py ./utils/
@@ -27,11 +28,11 @@ COPY src/agent_runtime.py ./
 # Signal that this is running in Docker for host binding logic
 #ENV DOCKER_CONTAINER=1
 
-RUN uv add aws_opentelemetry_distro_genai_beta>=0.1.2
+# RUN uv add aws_opentelemetry_distro_genai_beta>=0.1.2
 
 # Create non-root user
-RUN useradd -m -u 1000 bedrock_agentcore
-USER bedrock_agentcore
+# RUN useradd -m -u 1000 bedrock_agentcore
+# USER bedrock_agentcore
 
 # Expose port 8080 (AgentCore requirement)
 EXPOSE 8080

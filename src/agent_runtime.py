@@ -8,6 +8,7 @@ import functools
 import sys
 import os
 import time
+from datetime import datetime
 from typing import AsyncGenerator, Optional
 
 from fastapi import FastAPI, HTTPException
@@ -310,7 +311,7 @@ async def invoke_agent(request: InvocationRequest):
 @app.get("/ping")
 async def ping():
     """Health check endpoint"""
-    return {"status": "healthy", "agent_type": "diy_simple", "pattern": "aws_exact"}
+    return {"status": "healthy", "time_of_last_update": datetime.now().strftime("%Y%m%d-%H%M%S")}
 
 
 # ============================================================================
@@ -321,5 +322,4 @@ async def ping():
 if __name__ == "__main__":
     logger.info("🚀 Starting Simple DIY Agent with AWS patterns...")
     import uvicorn
-
     uvicorn.run(app, host="0.0.0.0", port=8080)
