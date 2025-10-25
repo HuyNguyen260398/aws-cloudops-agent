@@ -76,7 +76,7 @@ existing_runtime_arn = None
 existing_runtime_id = None
 
 try:
-    # Try to list runtimes and find our DIY runtime
+    # Try to list runtimes and find our agent runtime
     runtimes_response = control_client.list_agent_runtimes()
     for runtime in runtimes_response.get('agentRuntimes', []):
         if runtime.get('agentRuntimeName') == AGENT_RUNTIME_NAME:
@@ -159,7 +159,7 @@ try:
                 print(f"   📊 Status: {status} ({wait_time}s)")
                 
                 if status == 'READY':
-                    print(f"✅ DIY Runtime is READY!")
+                    print(f"✅ AWS CloudOps Agent Runtime is READY!")
                     
                     # Create DEFAULT endpoint
                     print(f"\n🔗 Creating DEFAULT endpoint...")
@@ -222,5 +222,5 @@ try:
         print(f"   ID: {runtime_id}")
 
 except Exception as e:
-    print(f"❌ Error creating/updating DIY runtime: {e}")
+    print(f"❌ Error creating/updating AWS CloudOps Agent runtime: {e}")
     sys.exit(1)

@@ -1,9 +1,3 @@
-#!/usr/bin/env python3
-"""
-Simplified DIY Agent following EXACT AWS documentation MCP patterns
-Based on: https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway-using-mcp-clients.html
-"""
-
 import functools
 import sys
 import os
@@ -182,7 +176,7 @@ def echo_message(message: str) -> str:
 config_manager = AgentCoreConfigManager()
 model_settings = config_manager.get_model_settings()
 
-logger.info(f"🚀 Simple DIY Agent with model: {model_settings['model_id']}")
+logger.info(f"🚀 AWS CloudOps Agent with Bedrock model: {model_settings['model_id']}")
 
 
 # ============================================================================
@@ -237,7 +231,7 @@ async def stream_response(
 
     except Exception as e:
         logger.error(f"❌ Streaming error: {e}")
-        error_response = format_error_response(str(e), "diy")
+        error_response = format_error_response(str(e), "agent_runtime")
         yield error_response
 
 
@@ -248,7 +242,7 @@ async def stream_response(
 
 def initialize():
     """Initialize OAuth and Memory"""
-    logger.info("🚀 Initializing Simple DIY Agent...")
+    logger.info("🚀 Initializing AWS CloudOps Agent...")
 
     if setup_oauth():
         logger.info("✅ OAuth initialized")
@@ -260,7 +254,7 @@ def initialize():
     else:
         logger.warning("⚠️ Memory not available")
 
-    logger.info("✅ Simple DIY Agent ready")
+    logger.info("✅ AWS CloudOps Agent ready")
 
 
 # Initialize on startup
@@ -275,7 +269,7 @@ except Exception as e:
 # ============================================================================
 
 
-app = FastAPI(title="Simple DIY Agent (AWS Pattern)", version="1.0.0")
+app = FastAPI(title="AWS CloudOps Agent", version="1.0.0")
 
 
 class InvocationRequest(BaseModel):
@@ -320,6 +314,6 @@ async def ping():
 
 
 if __name__ == "__main__":
-    logger.info("🚀 Starting Simple DIY Agent with AWS patterns...")
+    logger.info("🚀 Starting AWS CloudOps Agent ...")
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8080)

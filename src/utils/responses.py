@@ -8,13 +8,13 @@ import utils.mylogger as mylogger
 logger = mylogger.get_logger()
 
 # ============================================================================
-# DIY RESPONSE FORMATTING
+# AGENT RESPONSE FORMATTING
 # ============================================================================
 
 
 def format_diy_response(event):
     """
-    Format event for DIY agent streaming (Server-Sent Events) with enhanced text processing.
+    Format event for agent streaming (Server-Sent Events) with enhanced text processing.
 
     Args:
         event: Strands streaming event
@@ -56,7 +56,7 @@ def format_diy_response(event):
         return formatted
 
     except Exception as e:
-        logger.error(f"❌ Failed to format DIY response: {e}")
+        logger.error(f"❌ Failed to format agent response: {e}")
         logger.error(f"❌ Event details: {type(event).__name__}")
         logger.error(f"❌ Event content: {str(event)[:200]}...")
         # Re-raise the exception to expose the real issue
@@ -159,7 +159,7 @@ def extract_content_from_event(event) -> dict:
         extracted_text = None
         extraction_method = None
 
-        # Priority 1: Extract from nested dictionary structure (DIY agent format)
+        # Priority 1: Extract from nested dictionary structure (agent format)
         if not extracted_text and isinstance(event, dict) and "event" in event:
             inner_event = event["event"]
             if "contentBlockDelta" in inner_event:
@@ -285,7 +285,7 @@ def format_error_response(error_message, agent_type="diy"):
     """
     try:
         if agent_type == "diy":
-            # Format as SSE for DIY agent
+            # Format as SSE for agent
             error_data = json.dumps({"error": error_message, "type": "error"})
             return f"data: {error_data}\n\n"
         else:
@@ -295,3 +295,55 @@ def format_error_response(error_message, agent_type="diy"):
     except Exception as e:
         logger.error(f"❌ Failed to format error response: {e}")
         return f"Error: {error_message}"
+
+
+def extract_agent_message_from_response(response):
+    """
+    Extract only the agent message content from the response.
+
+    Args:
+        response: The response from the agent runtime
+
+    Returns:
+        str: The extracted agent message content
+    """
+    agent_message = ""
+
+    # Process the response
+    if "text/event-stream" in response.get("contentType", ""):
+        # Handle streaming response
+        for line in response["response"].iter_lines(chunk_size=10):
+            if line:
+                line = line.decode("utf-8")
+                if line.startswith("data: "):
+                    line = line[6:]
+
+                    try:
+                        # Parse the JSON line
+                        data = json.loads(line)
+
+                        # Extract text_delta content
+                        if data.get("type") == "text_delta" and "content" in data:
+                            agent_message += data["content"]
+
+                    except json.JSONDecodeError:
+                        # Skip lines that aren't valid JSON
+                        continue
+
+    elif response.get("contentType") == "application/json":
+        # Handle standard JSON response
+        content = []
+        for chunk in response.get("response", []):
+            content.append(chunk.decode("utf-8"))
+
+        try:
+            response_data = json.loads("".join(content))
+            # Extract message from JSON response structure
+            if "message" in response_data:
+                agent_message = response_data["message"]
+        except json.JSONDecodeError:
+            pass
+
+    # Clean the message
+    agent_message = agent_message.replace("\\n", "\n").strip()
+    return agent_message
