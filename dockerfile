@@ -1,19 +1,46 @@
-# Use uv's ARM64 Python base image
 FROM --platform=linux/arm64 ghcr.io/astral-sh/uv:python3.11-bookworm-slim
 
 WORKDIR /app
 
-# Copy uv files
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY pyproject.toml uv.lock ./
 
-# Install dependencies (including strands-agents)
 RUN uv sync --frozen --no-cache
 
-# Copy agent file
-COPY agent_fastapi.py aws_cloudops_agent.py ./
+COPY config/static-config.yaml ./config/
+COPY config/dynamic-config.yaml ./config/
 
-# Expose port
+COPY src/utils/config_manager.py ./utils/
+COPY src/utils/config_validator.py ./utils/
+COPY src/utils/config.py ./utils/
+COPY src/utils/mylogger.py ./utils/
+COPY src/utils/responses.py ./utils/
+
+COPY src/agents/aws_cloudops_agent.py ./agents/
+COPY src/components/memory.py ./components/
+
+COPY src/agent_runtime.py ./
+
+# Signal that this is running in Docker for host binding logic
+#ENV DOCKER_CONTAINER=1
+
+# RUN uv add aws_opentelemetry_distro_genai_beta>=0.1.2
+
+# Create non-root user
+# RUN useradd -m -u 1000 bedrock_agentcore
+# USER bedrock_agentcore
+
+# Expose port 8080 (AgentCore requirement)
 EXPOSE 8080
 
-# Run application
-CMD ["uv", "run", "uvicorn", "agent_fastapi:app", "--host", "0.0.0.0", "--port", "8080"]
+# Comment below to run in agentcore runtime
+# Uncomment below to run in local container on desktop
+CMD ["uv", "run", "uvicorn", "agent_runtime:app", "--host", "0.0.0.0", "--port", "8080"]
+
+# Uncomment below to run in agentcore runtime
+# Comment below to run in local container on desktop
+# CMD ["opentelemetry-instrument", "python", "agent_runtime.py"]
