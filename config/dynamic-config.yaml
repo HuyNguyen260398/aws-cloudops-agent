@@ -1,0 +1,29 @@
+client:
+  diy_runtime_endpoint: ''
+  sdk_runtime_endpoint: ''
+gateway:
+  arn: ''
+  id: ''
+  url: ''
+mcp_lambda:
+  function_arn: ''
+  function_name: ''
+  gateway_execution_role_arn: ''
+  role_arn: ''
+  stack_name: ''
+memory:
+  arn: arn:aws:bedrock-agentcore:ap-southeast-1:010382427026:memory/aws_cloudops_agent_memory-0a8krfFMbJ
+  id: aws_cloudops_agent_memory-0a8krfFMbJ
+oauth_provider:
+  provider_arn: ''
+  provider_name: ''
+  scopes: []
+runtime:
+  p_agent:
+    arn: arn:aws:bedrock-agentcore:ap-southeast-1:010382427026:runtime/aws_cloudops_agent-t6rEDA5h0K
+    ecr_uri: 010382427026.dkr.ecr.ap-southeast-1.amazonaws.com/aws-cloudops-agent:latest
+    endpoint_arn: arn:aws:bedrock-agentcore:ap-southeast-1:010382427026:runtime/aws_cloudops_agent-t6rEDA5h0K/runtime-endpoint/DEFAULT
+  q_agent:
+    arn: arn:aws:bedrock-agentcore:ap-southeast-1:010382427026:runtime/test_agentcore_agent-07j1198j5o
+    ecr_uri: 010382427026.dkr.ecr.ap-southeast-1.amazonaws.com/bedrock-agentcore-test_agentcore_agent:latest
+    endpoint_arn: ''
