@@ -347,3 +347,62 @@ def extract_agent_message_from_response(response):
     # Clean the message
     agent_message = agent_message.replace("\\n", "\n").strip()
     return agent_message
+
+
+async def print_agentcore_response_async(response):
+    """
+    Print Bedrock AgentCore response asynchronously with lazy loading.
+
+    Args:
+        response: Response from bedrock-agentcore client
+    """
+    if "text/event-stream" in response.get("contentType", ""):
+        # Stream response chunks as they arrive
+        for line in response["response"].iter_lines(chunk_size=10):
+            if line:
+                line = line.decode("utf-8")
+                if line.startswith("data: "):
+                    try:
+                        data = json.loads(line[6:])
+                        if data.get("type") == "text_delta" and "content" in data:
+                            # Print immediately without buffering
+                            print(data["content"], end="", flush=True)
+                    except json.JSONDecodeError:
+                        continue
+        print()  # Final newline
+
+    elif response.get("contentType") == "application/json":
+        # Handle JSON response
+        content = "".join(
+            chunk.decode("utf-8") for chunk in response.get("response", [])
+        )
+        data = json.loads(content)
+        print(data.get("message", content))
+
+
+def print_agentcore_response_sync(response):
+    """
+    Print Bedrock AgentCore response synchronously with lazy loading.
+
+    Args:
+        response: Response from bedrock-agentcore client
+    """
+    if "text/event-stream" in response.get("contentType", ""):
+        for line in response["response"].iter_lines(chunk_size=10):
+            if line:
+                line = line.decode("utf-8")
+                if line.startswith("data: "):
+                    try:
+                        data = json.loads(line[6:])
+                        if data.get("type") == "text_delta" and "content" in data:
+                            print(data["content"], end="", flush=True)
+                    except json.JSONDecodeError:
+                        continue
+        print()
+
+    elif response.get("contentType") == "application/json":
+        content = "".join(
+            chunk.decode("utf-8") for chunk in response.get("response", [])
+        )
+        data = json.loads(content)
+        print(data.get("message", content))
