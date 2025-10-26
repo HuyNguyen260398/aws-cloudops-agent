@@ -54,7 +54,7 @@ while True:
     
     # Prepare the payload
     payload = json.dumps(
-        {"prompt": user_prompt, "session_id": "horous_session", "actor_id": "Horous"}
+        {"prompt": user_prompt, "session_id": session_id, "actor_id": "user"}
     ).encode()
     
     # Loading animation
