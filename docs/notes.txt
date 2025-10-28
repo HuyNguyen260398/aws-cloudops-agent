@@ -1,0 +1,89 @@
+Create OU for the team
+
+    AWS access portal URL: https://d-96675c542b.awsapps.com/start,
+	
+create access token
+
+	aws sts get-session-token --duration-seconds 7200
+	
+env vars
+
+	$env:AWS_ACCESS_KEY_ID=""
+	$env:AWS_SECRET_ACCESS_KEY=""
+	$env:AWS_REGION="ap-southeast-1"
+	
+deploy to AgentCore using docker
+
+	# Build image
+	docker buildx build --platform linux/arm64 -t my-agent:arm64 --load .
+	
+	# Local test with token
+	docker run --platform linux/arm64 -p 8080:8080 -e AWS_ACCESS_KEY_ID="" -e AWS_SECRET_ACCESS_KEY="" -e AWS_SESSION_TOKEN="" -e AWS_REGION="ap-southeast-1" my-agent:arm64
+	
+	# Create ECR repository
+	aws ecr create-repository --repository-name aws-cloudops-agent --region ap-southeast-1
+
+	# Login to ECR
+	aws ecr get-login-password --region ap-southeast-1 | docker login --username AWS --password-stdin 010382427026.dkr.ecr.ap-southeast-1.amazonaws.com/aws-cloudops-agent
+
+	# Build and push to ECR
+	docker buildx build --platform linux/arm64 -t 010382427026.dkr.ecr.ap-southeast-1.amazonaws.com/aws-cloudops-agent:latest --push .
+
+	# Verify the image
+	aws ecr describe-images --repository-name aws-cloudops-agent --region ap-southeast-1
+	
+AgentCore roles
+	
+	create AgentRuntimeRole
+	
+		aws iam create-role --role-name AgentRuntimeRole --assume-role-policy-document file://trust-policy.json --description "IAM role for AWS CloudOps Agent runtime with Bedrock AgentCore permissions"
+		
+		aws iam put-role-policy --role-name AgentRuntimeRole --policy-name AgentRuntimePolicy --policy-document file://AgentRuntimeRole.json
+		
+		aws iam get-role --role-name AgentRuntimeRole
+		
+		aws iam get-role-policy --role-name AgentRuntimeRole --policy-name AgentRuntimePolicy
+	
+	assign role to user
+	
+		aws iam create-policy --policy-name AssumeAgentRuntimeRolePolicy --policy-document file://assume-role-policy.json --description "Policy to allow assuming the AgentRuntimeRole"
+		
+		aws iam attach-user-policy --user-name huy_ng --policy-arn arn:aws:iam::010382427026:policy/AssumeAgentRuntimeRolePolicy
+		
+		aws iam list-attached-user-policies --user-name huy_ng
+		
+		aws sts assume-role --role-arn arn:aws:iam::010382427026:role/AgentRuntimeRole --role-session-name TestSession
+		
+	create role update
+	
+		aws iam create-role --role-name BedrockAgentCoreRole --assume-role-policy-document file://bac-trust-policy.json
+		
+		aws iam put-role-policy --role-name BedrockAgentCoreRole --policy-name BedrockAgentCorePermissions --policy-document file://bac-permissions-policy.json
+	
+Bedrock Model Invoke monitor setup on CloudWatch
+
+	1. Create the CloudWatch Log Group
+
+		aws logs create-log-group --log-group-name /aws/bedrock/modelinvocations --region ap-southeast-1
+		
+	2. Create the Permissions Policy	
+
+		aws iam create-policy --policy-name BedrockCloudWatchLogsPolicy --policy-document file://assets/bac-cw-model-invoke-permiossion-policy.json --description "Policy for Bedrock model invocation CloudWatch logging" 
+	
+	3. Create the IAM Role with Trust Policy
+	
+		aws iam create-role --role-name BedrockCloudWatchLogsRole --assume-role-policy-document file://assets/bac-cw-model-invoke-trust-relationship.json --description "Role for Bedrock to write model invocation logs to CloudWatch"
+		
+	4. Attach Policy to Role
+	
+		aws iam attach-role-policy --role-name BedrockCloudWatchLogsRole --policy-arn arn:aws:iam::010382427026:policy/BedrockCloudWatchLogsPolicy
+		
+	Connection Flow:
+
+		Bedrock assumes the IAM Role (via trust policy)
+
+		IAM Role has Permissions Policy attached
+
+		Permissions Policy grants write access to CloudWatch Log Group
+
+		Bedrock logging configuration uses the role to write logs
