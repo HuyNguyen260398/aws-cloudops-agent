@@ -33,6 +33,7 @@ agent_core_client = boto3.client("bedrock-agentcore")
 
 # Generate session ID for the conversation
 session_id = str(uuid.uuid4())
+print(f"🆔 Session ID: {session_id}")
 
 print("\n🤖 AWS CloudOps Agent - Chat Mode")
 print("Type 'exit', 'end', or 'bye' to quit\n")
@@ -53,7 +54,7 @@ while True:
     
     # Prepare the payload
     payload = json.dumps(
-        {"prompt": user_prompt, "session_id": session_id, "actor_id": "user"}
+        {"prompt": user_prompt, "session_id": "horous_session", "actor_id": "Horous"}
     ).encode()
     
     # Loading animation
