@@ -162,6 +162,11 @@ class AgentCoreConfigManager:
         config = self.get_merged_config()
         return config.get("okta", {})
 
+    def get_basic_auth_settings(self) -> Dict[str, Any]:
+        """Get basic auth settings (Cognito)"""
+        config = self.get_merged_config()
+        return config.get("auth", {}).get("cognito_idp", {})
+
     def get_tools_schema(self) -> List[Dict[str, Any]]:
         """Get Bedrock agent tools schema (for gateway target creation)"""
         config = self.get_static_config()
