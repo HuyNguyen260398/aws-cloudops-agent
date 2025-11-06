@@ -37,15 +37,6 @@ okta:
     cache_duration: 300
     refresh_threshold: 60
 
-
-# AgentCore JWT Authorizer Configuration for Runtime
-agentcore:
-  jwt_authorizer:
-    discovery_url: "https://<YOUR_OKTA_DOMAIN>/oauth2/default/.well-known/openid-configuration"
-    allowed_audience: 
-      - "<YOUR_OKTA_AUTHORIZATION_SERVER_AUDIENCE>"
-
-
 # Client Settings (used by chatbot client)
 client:
   default_agent: "sdk"
@@ -80,15 +71,12 @@ mcp_lambda:
   ecr_repository_name: "bac-mcp-tool-repo"
   stack_name: "bac-mcp-stack"
 
-
-
 # AgentCore JWT Authorizer Configuration for Runtime
 auth:
   cognito_idp:
     pool_id: "ap-southeast-1_jjG5DkVCy"
     client_id: "40ede8sr0l0bs37hps0lbgvr8p"
     discovery_url: "https://cognito-idp.ap-southeast-1.amazonaws.com/ap-southeast-1_jjG5DkVCy/.well-known/openid-configuration"
-
 
 # Memory Settings (used by deployment scripts and agents)
 memory:

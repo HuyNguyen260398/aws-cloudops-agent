@@ -20,11 +20,7 @@ from mcp.client.streamable_http import streamablehttp_client
 from strands import tool
 from strands.models import BedrockModel
 from strands.tools.mcp.mcp_client import MCPClient
-
-from strands_tools import think, use_aws
-
 from strands_tools import use_aws, handoff_to_user
-
 
 # Shared utilities
 from agents.aws_cloudops_agent import AwsCloudOpsAgent
@@ -90,11 +86,7 @@ async def execute_agent_streaming(bedrock_model, prompt):
     # Fallback to local tools if gateway or oauth is not working
     if not gateway_url or not is_oauth_available():
         logger.info("🏠 No MCP available - using local streaming")
-
-        local_tools = [get_current_time, echo_message, think, use_aws]
-
         local_tools = [get_current_time, echo_message, use_aws, handoff_to_user]
-
         agent = AwsCloudOpsAgent(model=bedrock_model, tools=local_tools)
         async for event in agent.stream_async(prompt):
             yield event
@@ -148,11 +140,7 @@ async def execute_agent_streaming(bedrock_model, prompt):
         logger.error(f"❌ MCP streaming failed: {e}")
         # Fallback to local streaming
         logger.info("🏠 Falling back to local streaming")
-
-        local_tools = [get_current_time, echo_message, think, use_aws]
-
         local_tools = [get_current_time, echo_message, use_aws, handoff_to_user]
-
         agent = AwsCloudOpsAgent(model=bedrock_model, tools=local_tools)
         async for event in agent.stream_async(prompt):
             logger.info("@@@@@@@@@@@@@@@@@@@@")

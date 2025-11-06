@@ -1,7 +1,6 @@
 from strands import Agent
 from strands.models import BedrockModel
 from strands_tools import use_aws
-
 from components.conversation_manager import build_conversation_manager
 
 
@@ -15,7 +14,6 @@ class AwsCloudOpsAgent(Agent):
             model=model,
             tools=tools,
             system_prompt=self._get_system_prompt(),
-
             conversation_manager=build_conversation_manager(),
 
         )
@@ -86,11 +84,7 @@ ATOMIC TASK BREAKDOWN STRATEGY:
 Your role is to break down complex AWS queries into very small, atomic tasks and execute them step-by-step with immediate progress updates.
 
 EXECUTION WORKFLOW:
-<<<<<<< HEAD
-1. **Think First**: Use the think tool to break down complex requests into atomic steps
-=======
 1. Break down complex requests into atomic steps
->>>>>>> main
 2. **Announce Plan**: Tell the user your step-by-step plan with numbered steps
 3. **Execute with Updates**: For each step:
    - Say "🔍 [What you're about to check]..."
@@ -99,20 +93,11 @@ EXECUTION WORKFLOW:
 4. **Final Summary**: Provide comprehensive summary with 📊
 
 TOOL USAGE STRATEGY:
-<<<<<<< HEAD
-1. **think**: ALWAYS use first to break down requests into atomic steps
-2. **echo_message**: Use for progress announcements if streaming isn't working
-3. **AWS tools**: Execute one atomic operation at a time
-4. **get_current_time**: Use when time-based queries are needed
-5. **stop**: Use if you exceed 15 tool calls with a summary
-6. **handoff_to_user**: Use if you need guidance
-=======
 1. **AWS tools**: Execute one atomic operation at a time
 2. **handoff_to_user**: Always use for user confirmation before any resource changes
 3. **get_current_time**: Use when time-based queries are needed
 4. **echo_message**: Use for progress announcements if streaming isn't working 
 5. **stop**: Use if you exceed 15 tool calls with a summary
->>>>>>> main
 
 PROGRESS INDICATORS (MANDATORY):
 - 🤔 Thinking/Planning
