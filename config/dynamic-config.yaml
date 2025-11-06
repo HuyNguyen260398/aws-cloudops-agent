@@ -2,9 +2,9 @@ client:
   diy_runtime_endpoint: ''
   sdk_runtime_endpoint: ''
 gateway:
-  arn: ''
-  id: ''
-  url: ''
+  arn: arn:aws:bedrock-agentcore:ap-southeast-1:010382427026:gateway/aws-cloudops-agent-gateway-oixoe1mmoq
+  id: aws-cloudops-agent-gateway-oixoe1mmoq
+  url: https://aws-cloudops-agent-gateway-oixoe1mmoq.gateway.bedrock-agentcore.ap-southeast-1.amazonaws.com/mcp
 mcp_lambda:
   function_arn: ''
   function_name: ''
