@@ -8,6 +8,7 @@ import boto3
 import time
 import sys
 import os
+from dotenv import load_dotenv
 
 # ============================================================================
 # CONFIGURATION
@@ -15,7 +16,10 @@ import os
 
 # Add project root to path for shared config manager
 src_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+project_root = os.path.dirname(src_root)
 sys.path.append(src_root)
+
+load_dotenv(os.path.join(project_root, "config", ".env"))
 
 from utils.config_manager import AgentCoreConfigManager
 
@@ -107,10 +111,15 @@ try:
         print(f"\n🔄 Updating existing runtime with new configuration...")
 
         try:
+            # Load environment variables for container
+            env_vars = {k: v for k, v in os.environ.items() if not k.startswith("_")}
+
             update_response = control_client.update_agent_runtime(
                 agentRuntimeId=existing_runtime_id,
                 agentRuntimeArtifact={
-                    "containerConfiguration": {"containerUri": ECR_URI}
+                    "containerConfiguration": {
+                        "containerUri": ECR_URI,
+                    }
                 },
                 roleArn=ROLE_ARN,
                 networkConfiguration={"networkMode": "PUBLIC"},
@@ -119,6 +128,13 @@ try:
                         "discoveryUrl": COGNITO_DISCOVERY_URL,
                         "allowedClients": [COGNITO_CLIENT_ID],
                     }
+                },
+                environmentVariables={
+                    "AWS_ACCESS_KEY_ID": env_vars.get("AWS_ACCESS_KEY_ID", ""),
+                    "AWS_SECRET_ACCESS_KEY": env_vars.get("AWS_SECRET_ACCESS_KEY", ""),
+                    "AWS_REGION": env_vars.get("AWS_REGION", REGION),
+                    "COGNITO_USERNAME": env_vars.get("COGNITO_USERNAME", ""),
+                    "COGNITO_PASSWORD": env_vars.get("COGNITO_PASSWORD", ""),
                 },
             )
 
