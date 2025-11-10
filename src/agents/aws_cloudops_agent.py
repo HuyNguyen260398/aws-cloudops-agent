@@ -1,6 +1,9 @@
 from strands import Agent
 from strands.models import BedrockModel
 from strands_tools import use_aws
+from components.conversation_manager import build_conversation_manager
+
+
 
 
 class AwsCloudOpsAgent(Agent):
@@ -11,6 +14,8 @@ class AwsCloudOpsAgent(Agent):
             model=model,
             tools=tools,
             system_prompt=self._get_system_prompt(),
+            conversation_manager=build_conversation_manager(),
+
         )
 
     def _get_system_prompt(self) -> str:
