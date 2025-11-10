@@ -15,7 +15,7 @@ src_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(src_root)
 
 from utils.config_manager import AgentCoreConfigManager
-from utils.auth import get_cognito_jwt_token
+from components.auth import get_cognito_jwt_token
 
 # ============================================================================
 # CONFIGURATION
@@ -27,17 +27,17 @@ base_config = config_manager.get_base_settings()
 cognito_config = config_manager.get_basic_auth_settings()
 
 # Get runtime ARN and region
-runtime_arn = merged_config['runtime']['p_agent']['arn']
-region = base_config['aws']['region']
+runtime_arn = merged_config.get("runtime", {}).get("p_agent", {}).get("arn", "")
+region = base_config.get("aws", {}).get("region", "")
 
 if not runtime_arn:
     print("❌ Runtime ARN not found in config. Please deploy the runtime first.")
     sys.exit(1)
 
 # Get Cognito configuration
-cognito_pool_id = cognito_config.get('pool_id')
-cognito_client_id = cognito_config.get('client_id')
-cognito_discovery_url = cognito_config.get('discovery_url')
+cognito_pool_id = cognito_config.get("pool_id", "")
+cognito_client_id = cognito_config.get("client_id", "")
+cognito_discovery_url = cognito_config.get("discovery_url", "")
 
 if not all([cognito_pool_id, cognito_client_id, cognito_discovery_url]):
     print("❌ Missing Cognito configuration. Required:")
@@ -80,7 +80,7 @@ print("✅ JWT token obtained successfully")
 # ============================================================================
 
 # URL encode the agent ARN
-escaped_agent_arn = urllib.parse.quote(runtime_arn, safe='')
+escaped_agent_arn = urllib.parse.quote(runtime_arn, safe="")
 
 # Construct the endpoint URL
 url = f"https://bedrock-agentcore.{region}.amazonaws.com/runtimes/{escaped_agent_arn}/invocations?qualifier=DEFAULT"
@@ -99,35 +99,37 @@ session_id = str(uuid.uuid4())
 while True:
     # Get user input
     user_prompt = input("\n💬 You: ").strip()
-    
+
     if not user_prompt:
         continue
-    
+
     # Check for exit commands
-    if user_prompt.lower() in ['exit', 'end', 'bye']:
+    if user_prompt.lower() in ["exit", "end", "bye"]:
         print("\n👋 Goodbye!")
         break
-    
+
     # Set up headers with JWT token
     headers = {
         "Authorization": f"Bearer {jwt_token}",
         "Content-Type": "application/json",
-        "X-Amzn-Bedrock-AgentCore-Runtime-Session-Id": session_id
+        "X-Amzn-Bedrock-AgentCore-Runtime-Session-Id": session_id,
     }
-    
+
     # Prepare payload
     payload = {
         "prompt": user_prompt,
         "session_id": session_id,
-        "actor_id": cognito_username
+        "actor_id": cognito_username,
     }
-    
+
     print("\r🤖 Agent: ⏳", end="", flush=True)
-    
+
     try:
         # Invoke the agent with JWT token (streaming response)
-        response = requests.post(url, headers=headers, data=json.dumps(payload), stream=True)
-        
+        response = requests.post(
+            url, headers=headers, data=json.dumps(payload), stream=True
+        )
+
         print("\r🤖 Agent: ", end="", flush=True)
 
         # Handle response
@@ -135,14 +137,14 @@ while True:
             # Handle streaming response (SSE format)
             for line in response.iter_lines():
                 if line:
-                    decoded_line = line.decode('utf-8')
-                    if decoded_line.startswith('data: '):
+                    decoded_line = line.decode("utf-8")
+                    if decoded_line.startswith("data: "):
                         data_content = decoded_line[6:]  # Remove 'data: ' prefix
                         try:
                             data_json = json.loads(data_content)
                             # Only print text_delta content for clean output
-                            if data_json.get('type') == 'text_delta':
-                                print(data_json.get('content', ''), end='', flush=True)
+                            if data_json.get("type") == "text_delta":
+                                print(data_json.get("content", ""), end="", flush=True)
                         except json.JSONDecodeError:
                             pass  # Skip non-JSON lines
         elif response.status_code == 401:
@@ -154,20 +156,20 @@ while True:
             try:
                 error_data = response.json()
                 print(json.dumps(error_data, indent=2))
-                if response.status_code == 400 and 'DiscoveryUrl' in response.text:
+                if response.status_code == 400 and "DiscoveryUrl" in response.text:
                     print("\n💡 Hint: Runtime needs JWT authorizer configuration.")
                     print(f"   Expected Discovery URL: {cognito_discovery_url}")
             except:
                 print(response.text[:500])
-                if 'DiscoveryUrl' in response.text:
+                if "DiscoveryUrl" in response.text:
                     print("\n💡 Hint: Runtime needs JWT authorizer configuration.")
                     print(f"   Expected Discovery URL: {cognito_discovery_url}")
-    
+
     except requests.exceptions.Timeout:
         print("\r🤖 Agent: ❌ Request timed out")
     except requests.exceptions.RequestException as e:
         print(f"\r🤖 Agent: ❌ Request failed: {e}")
     except Exception as e:
         print(f"\r🤖 Agent: ❌ Unexpected error: {e}")
-    
+
     print("\n" + "=" * 50)
