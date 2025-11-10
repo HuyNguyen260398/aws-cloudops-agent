@@ -63,8 +63,9 @@ runtime:
 
 # Gateway Base Settings
 gateway:
-  name: "bac-gtw"
+  name: "aws-cloudops-agent-gateway"
   protocol: "MCP"
+  url: "https://aws-cloudops-agent-gateway-oixoe1mmoq.gateway.bedrock-agentcore.ap-southeast-1.amazonaws.com/mcp"
 
 # MCP Lambda Settings (used by deployment scripts)
 mcp_lambda:

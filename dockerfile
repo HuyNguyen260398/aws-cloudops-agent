@@ -19,8 +19,12 @@ COPY src/utils/config_validator.py ./utils/
 COPY src/utils/config.py ./utils/
 COPY src/utils/mylogger.py ./utils/
 COPY src/utils/responses.py ./utils/
+COPY src/utils/query_extractor.py ./utils/
 
 COPY src/agents/aws_cloudops_agent.py ./agents/
+COPY src/components/auth.py ./components/
+COPY src/components/gateway.py ./components/
+COPY src/components/mcp.py ./components/
 COPY src/components/memory.py ./components/
 
 COPY src/agent_runtime.py ./

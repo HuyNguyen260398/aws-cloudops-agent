@@ -19,17 +19,25 @@ sys.path.append(project_root)
 from mcp.client.streamable_http import streamablehttp_client
 from strands import tool
 from strands.models import BedrockModel
-from strands.tools.mcp.mcp_client import MCPClient
+from strands.tools.mcp.mcp_client import MCPClient, MCPAgentTool
 from strands_tools import use_aws, handoff_to_user
 
 # Shared utilities
 from agents.aws_cloudops_agent import AwsCloudOpsAgent
 from utils.config_manager import AgentCoreConfigManager
+from utils.query_extractor import extract_tool_query
+from components.gateway import tool_search
 
 from utils.responses import (
     format_diy_response,
     extract_text_from_event,
     format_error_response,
+)
+
+from components.auth import (
+    is_oauth_available,
+    setup_oauth,
+    get_m2m_token,
 )
 
 from components.memory import (
@@ -57,27 +65,9 @@ def _create_streamable_http_transport(url, headers=None):
     return streamablehttp_client(url, headers=headers)
 
 
-def is_oauth_available() -> bool:
-    """Check if OAuth is available - placeholder"""
-    # Implement actual check if needed
-    return False
-
-
-def get_m2m_token() -> Optional[str]:
-    """Get Machine-to-Machine OAuth token - placeholder"""
-    # Implement actual token retrieval if needed
-    return None
-
-
-def setup_oauth() -> bool:
-    """Set up OAuth - placeholder"""
-    # Implement actual OAuth setup if needed
-    return False
-
-
-async def execute_agent_streaming(bedrock_model, prompt):
+async def execute_agent_streaming(bedrock_model, prompt, pending_confirmation=None):
     """
-    Streaming version of AWS documented pattern
+    Streaming version of AWS documented pattern with handoff support
     """
     # Get configuration
     config_manager = AgentCoreConfigManager()
@@ -88,8 +78,14 @@ async def execute_agent_streaming(bedrock_model, prompt):
         logger.info("🏠 No MCP available - using local streaming")
         local_tools = [get_current_time, echo_message, use_aws, handoff_to_user]
         agent = AwsCloudOpsAgent(model=bedrock_model, tools=local_tools)
+        handoff_detected = False
         async for event in agent.stream_async(prompt):
-            yield event
+            # Check for handoff_to_user tool usage
+            if _is_handoff_event(event):
+                yield {"handoff_required": True, "event": event}
+                handoff_detected = True
+            elif not handoff_detected:
+                yield event
         return
 
     try:
@@ -109,32 +105,41 @@ async def execute_agent_streaming(bedrock_model, prompt):
 
         # EXACT AWS pattern: Use context manager
         with mcp_client:
-            tools = mcp_client.list_tools_sync()
+            # Use semantic search to get relevant tools
+            search_query = extract_tool_query(prompt)
+            logger.info(f"🔍 Tool search query: {search_query}")
+            
+            searched_tools = tool_search(gateway_url, access_token, search_query)
+            logger.info(f"🎯 Found {len(searched_tools)} relevant tools")
+            
+            # Convert to MCPAgentTool format
+            from mcp.types import Tool as MCPTool
+            tools = []
+            for tool in searched_tools[:10]:  # Limit to top 10
+                mcp_tool = MCPTool(
+                    name=tool["name"],
+                    description=tool["description"],
+                    inputSchema=tool["inputSchema"],
+                )
+                tools.append(MCPAgentTool(mcp_tool, mcp_client))
 
             # Add local tools
-            all_tools = [get_current_time, echo_message]
+            all_tools = [get_current_time, echo_message, use_aws, handoff_to_user]
             if tools:
                 all_tools.extend(tools)
-                logger.info(f"🛠️ Streaming with {len(tools)} MCP tools + local tools")
+                logger.info(f"🛠️ Streaming with {len(tools)} searched MCP tools + local tools")
 
-            logger.info("$$$$$$$$$$$$$$$$$$$$")
-            logger.info(f"All tools count: {len(all_tools)}")
-            logger.info("$$$$$$$$$$$$$$$$$$$$")
+            logger.info(f"🛠️ Total tools available: {len(all_tools)} (searched: {len(tools)}, local: 4)")
 
             agent = AwsCloudOpsAgent(model=bedrock_model, tools=all_tools)
+            handoff_detected = False
             async for event in agent.stream_async(prompt):
-                # logger.info("=" * 50)
-                # logger.info(f"Raw event: {event}")
-                # logger.info(f"Event type: {type(event)} at {time.time()}")
-                # Extract delta text if it's a contentBlockDelta event
-                if isinstance(event, dict) and "event" in event:
-                    inner_event = event["event"]
-                    if "contentBlockDelta" in inner_event:
-                        delta = inner_event["contentBlockDelta"].get("delta", {})
-                        if "text" in delta:
-                            logger.info(delta["text"])
-                # logger.info("*" * 50)
-                yield event
+                # Check for handoff_to_user tool usage
+                if _is_handoff_event(event):
+                    yield {"handoff_required": True, "event": event}
+                    handoff_detected = True
+                elif not handoff_detected:
+                    yield event
 
     except Exception as e:
         logger.error(f"❌ MCP streaming failed: {e}")
@@ -142,11 +147,42 @@ async def execute_agent_streaming(bedrock_model, prompt):
         logger.info("🏠 Falling back to local streaming")
         local_tools = [get_current_time, echo_message, use_aws, handoff_to_user]
         agent = AwsCloudOpsAgent(model=bedrock_model, tools=local_tools)
+        handoff_detected = False
         async for event in agent.stream_async(prompt):
-            logger.info("@@@@@@@@@@@@@@@@@@@@")
-            logger.info(tools)
-            logger.info("@@@@@@@@@@@@@@@@@@@@")
-            yield event
+            if _is_handoff_event(event):
+                yield {"handoff_required": True, "event": event}
+                handoff_detected = True
+            elif not handoff_detected:
+                yield event
+
+
+# ============================================================================
+# HANDOFF DETECTION
+# ============================================================================
+
+
+def _is_handoff_event(event) -> bool:
+    """Check if event contains handoff_to_user tool usage or confirmation prompt"""
+    if not isinstance(event, dict):
+        return False
+    
+    # Check for tool use in event structure
+    if "event" in event:
+        inner = event["event"]
+        if "contentBlockStart" in inner:
+            start = inner["contentBlockStart"].get("start", {})
+            if "toolUse" in start:
+                return start["toolUse"].get("name") == "handoff_to_user"
+        
+        # Check for confirmation prompt in text content
+        if "contentBlockDelta" in inner:
+            delta = inner["contentBlockDelta"].get("delta", {})
+            if "text" in delta:
+                text = delta["text"]
+                if "Do you want to proceed? [y/*]" in text or "is potentially mutative" in text:
+                    return True
+    
+    return False
 
 
 # ============================================================================
@@ -175,7 +211,6 @@ def echo_message(message: str) -> str:
 
 config_manager = AgentCoreConfigManager()
 model_settings = config_manager.get_model_settings()
-
 logger.info(f"🚀 AWS CloudOps Agent with Bedrock model: {model_settings['model_id']}")
 
 
@@ -209,7 +244,19 @@ async def stream_response(
         # Use AWS documented streaming pattern
         last_event_time = time.time()
 
+        handoff_detected = False
         async for event in execute_agent_streaming(model, final_message):
+            # Check for handoff requirement
+            if isinstance(event, dict) and event.get("handoff_required"):
+                logger.info("🤚 Handoff to user required - pausing execution")
+                yield "data: {\"type\": \"handoff_required\", \"message\": \"Agent requires your confirmation to proceed. Please respond with 'yes' or 'no'.\"}\n\n"
+                handoff_detected = True
+                continue
+            
+            # Skip remaining events after handoff
+            if handoff_detected:
+                continue
+            
             # Format and yield response
             formatted = format_diy_response(event)
             yield formatted
@@ -219,9 +266,6 @@ async def stream_response(
             text = extract_text_from_event(event)
             if text:
                 response_parts.append(text)
-
-            # Brief pause to prevent overwhelming the client
-            # await asyncio.sleep(0.01)
 
         # Save to memory if available
         if is_memory_available() and session_id and response_parts:
@@ -305,7 +349,10 @@ async def invoke_agent(request: InvocationRequest):
 @app.get("/ping")
 async def ping():
     """Health check endpoint"""
-    return {"status": "healthy", "time_of_last_update": datetime.now().strftime("%Y%m%d-%H%M%S")}
+    return {
+        "status": "healthy",
+        "time_of_last_update": datetime.now().strftime("%Y%m%d-%H%M%S"),
+    }
 
 
 # ============================================================================
@@ -316,4 +363,5 @@ async def ping():
 if __name__ == "__main__":
     logger.info("🚀 Starting AWS CloudOps Agent ...")
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8080)
