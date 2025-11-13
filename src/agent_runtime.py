@@ -4,6 +4,7 @@ import os
 import time
 from datetime import datetime
 from typing import AsyncGenerator, Optional
+from dotenv import load_dotenv
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
@@ -14,6 +15,8 @@ project_root = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 )
 sys.path.append(project_root)
+
+load_dotenv(os.path.join("config", ".env"))
 
 # AWS documented imports
 from mcp.client.streamable_http import streamablehttp_client
@@ -86,6 +89,7 @@ async def execute_agent_streaming(bedrock_model, prompt, pending_confirmation=No
             quick_kb_search
         ]
         agent = AwsCloudOpsAgent(model=bedrock_model, tools=local_tools)
+        logger.info(f"🤖 Using Bedrock Model ID: {agent.model.config}")
         handoff_detected = False
         async for event in agent.stream_async(prompt):
             # Check for handoff_to_user tool usage
@@ -147,6 +151,7 @@ async def execute_agent_streaming(bedrock_model, prompt, pending_confirmation=No
             logger.info(f"🛠️ Total tools available: {len(all_tools)} (searched: {len(tools)}, local: 6)")
 
             agent = AwsCloudOpsAgent(model=bedrock_model, tools=all_tools)
+            logger.info(f"🤖 Using Bedrock Model ID: {agent.model.config}")
             handoff_detected = False
             async for event in agent.stream_async(prompt):
                 # Check for handoff_to_user tool usage
@@ -169,6 +174,7 @@ async def execute_agent_streaming(bedrock_model, prompt, pending_confirmation=No
             quick_kb_search
         ]
         agent = AwsCloudOpsAgent(model=bedrock_model, tools=local_tools)
+        logger.info(f"🤖 Using Bedrock Model ID: {agent.model.config}")
         handoff_detected = False
         async for event in agent.stream_async(prompt):
             if _is_handoff_event(event):
@@ -262,6 +268,7 @@ async def stream_response(
 
         # Create model with longer timeout for streaming
         model = BedrockModel(**model_settings, streaming=True)
+        logger.info(f"🤖 Using Bedrock Model - ID: {model_settings['model_id']}, Region: {model_settings['region_name']}")
 
         # Use AWS documented streaming pattern
         last_event_time = time.time()
