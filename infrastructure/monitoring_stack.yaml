@@ -1,0 +1,108 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Complete monitoring infrastructure for AWS CloudOps Agent
+
+Parameters:
+  NotificationEmail:
+    Type: String
+    Description: Email for critical alerts
+
+Resources:
+  AlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: cloudops-agent-alerts
+      DisplayName: CloudOps Agent Alerts
+      Subscription:
+        - Endpoint: !Ref NotificationEmail
+          Protocol: email
+
+  MonitoringLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/cloudops-agent/monitoring
+      RetentionInDays: 30
+
+  MonitoringLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: cloudops-agent-monitoring-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/ReadOnlyAccess
+      Policies:
+        - PolicyName: MonitoringPermissions
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cloudwatch:*
+                  - health:*
+                  - ce:*
+                  - sns:Publish
+                  - bedrock:InvokeModel
+                Resource: '*'
+
+  MonitoringLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: cloudops-agent-monitor
+      Runtime: python3.11
+      Handler: workflows.event_driven_monitor.lambda_handler
+      Role: !GetAtt MonitoringLambdaRole.Arn
+      Timeout: 300
+      MemorySize: 512
+      Environment:
+        Variables:
+          ALERT_TOPIC_ARN: !Ref AlertTopic
+          LOG_LEVEL: INFO
+      Code:
+        ZipFile: |
+          def lambda_handler(event, context):
+              return {"statusCode": 200}
+
+  LambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref MonitoringLambda
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+
+  AgentErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: cloudops-agent-errors
+      AlarmDescription: Alert on monitoring agent errors
+      MetricName: Errors
+      Namespace: AWS/Lambda
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 5
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref MonitoringLambda
+      AlarmActions:
+        - !Ref AlertTopic
+
+Outputs:
+  MonitoringLambdaArn:
+    Value: !GetAtt MonitoringLambda.Arn
+    Export:
+      Name: CloudOpsAgentMonitoringLambdaArn
+  
+  AlertTopicArn:
+    Value: !Ref AlertTopic
+    Export:
+      Name: CloudOpsAgentAlertTopicArn
+  
+  LogGroupName:
+    Value: !Ref MonitoringLogGroup

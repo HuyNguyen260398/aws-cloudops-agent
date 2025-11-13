@@ -1,0 +1,98 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: EventBridge rules for AWS CloudOps Agent monitoring
+
+Parameters:
+  MonitoringLambdaArn:
+    Type: String
+    Description: ARN of the monitoring Lambda function
+
+Resources:
+  CloudWatchAlarmRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: cloudops-agent-alarm-monitor
+      Description: Trigger monitoring agent on CloudWatch alarm state changes
+      EventPattern:
+        source:
+          - aws.cloudwatch
+        detail-type:
+          - CloudWatch Alarm State Change
+        detail:
+          state:
+            value:
+              - ALARM
+              - INSUFFICIENT_DATA
+      State: ENABLED
+      Targets:
+        - Arn: !Ref MonitoringLambdaArn
+          Id: MonitoringLambdaTarget
+
+  HealthEventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: cloudops-agent-health-monitor
+      Description: Trigger monitoring agent on AWS Health events
+      EventPattern:
+        source:
+          - aws.health
+        detail-type:
+          - AWS Health Event
+      State: ENABLED
+      Targets:
+        - Arn: !Ref MonitoringLambdaArn
+          Id: MonitoringLambdaTarget
+
+  CostAnomalyRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: cloudops-agent-cost-monitor
+      Description: Trigger monitoring agent on cost anomalies
+      EventPattern:
+        source:
+          - aws.ce
+        detail-type:
+          - Cost Anomaly Detection
+      State: ENABLED
+      Targets:
+        - Arn: !Ref MonitoringLambdaArn
+          Id: MonitoringLambdaTarget
+
+  EC2StateChangeRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: cloudops-agent-ec2-monitor
+      Description: Monitor EC2 instance state changes
+      EventPattern:
+        source:
+          - aws.ec2
+        detail-type:
+          - EC2 Instance State-change Notification
+        detail:
+          state:
+            - stopped
+            - terminated
+            - stopping
+      State: ENABLED
+      Targets:
+        - Arn: !Ref MonitoringLambdaArn
+          Id: MonitoringLambdaTarget
+
+  ScheduledMonitoringRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: cloudops-agent-scheduled-monitor
+      Description: Run scheduled monitoring every 5 minutes
+      ScheduleExpression: rate(5 minutes)
+      State: ENABLED
+      Targets:
+        - Arn: !Ref MonitoringLambdaArn
+          Id: MonitoringLambdaTarget
+          Input: '{"source": "scheduled", "action": "full_scan"}'
+
+Outputs:
+  CloudWatchAlarmRuleArn:
+    Value: !GetAtt CloudWatchAlarmRule.Arn
+  HealthEventRuleArn:
+    Value: !GetAtt HealthEventRule.Arn
+  CostAnomalyRuleArn:
+    Value: !GetAtt CostAnomalyRule.Arn
