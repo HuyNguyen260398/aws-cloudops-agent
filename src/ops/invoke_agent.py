@@ -85,5 +85,3 @@ while True:
     # Print response with lazy loading (streaming)
     print_agentcore_response_sync(response)
     print("\n" + "=" * 50)
-
-
