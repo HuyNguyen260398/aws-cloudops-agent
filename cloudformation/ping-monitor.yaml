@@ -1,0 +1,101 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Lambda function to monitor nghuy.link domain every 5 minutes'
+
+Resources:
+  DomainAlertsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: domain-alerts
+      Subscription:
+        - Protocol: email
+          Endpoint: huynguyen260398@gmail.com
+
+  PingMonitorRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: PublishToSNS
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: sns:Publish
+                Resource: !Ref DomainAlertsTopic
+
+  PingMonitorFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: domain-ping-monitor
+      Runtime: python3.11
+      Handler: index.lambda_handler
+      Role: !GetAtt PingMonitorRole.Arn
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN: !Ref DomainAlertsTopic
+      Code:
+        ZipFile: |
+          import socket
+          import boto3
+          import os
+          from datetime import datetime
+
+          def lambda_handler(event, context):
+              domain = "nghuy.link"
+              
+              try:
+                  socket.gethostbyname(domain)
+                  print(f"{domain} is reachable at {datetime.now()}")
+                  return {"statusCode": 200, "body": f"{domain} is healthy"}
+                  
+              except socket.gaierror:
+                  message = f"ALERT: {domain} is unreachable at {datetime.now()}"
+                  print(message)
+                  
+                  sns = boto3.client('sns')
+                  try:
+                      sns.publish(
+                          TopicArn=os.environ['SNS_TOPIC_ARN'],
+                          Subject=f"Domain Alert: {domain} Down",
+                          Message=message
+                      )
+                      print("Email alert sent")
+                  except Exception as e:
+                      print(f"Failed to send email: {e}")
+                  
+                  return {"statusCode": 500, "body": message}
+      Timeout: 30
+
+  PingScheduleRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: 'Trigger ping monitor every 5 minutes'
+      ScheduleExpression: 'rate(5 minutes)'
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt PingMonitorFunction.Arn
+          Id: PingMonitorTarget
+
+  PingSchedulePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref PingMonitorFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt PingScheduleRule.Arn
+
+Outputs:
+  FunctionName:
+    Description: 'Lambda function name'
+    Value: !Ref PingMonitorFunction
+  ScheduleRule:
+    Description: 'EventBridge rule ARN'
+    Value: !GetAtt PingScheduleRule.Arn
