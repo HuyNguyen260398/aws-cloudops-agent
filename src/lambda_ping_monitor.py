@@ -7,6 +7,64 @@ from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 
 
+def send_slack_notification(domain, status, timestamp):
+    """Send notification to Slack channel via webhook using adaptive card format"""
+    webhook_url = os.environ.get("SLACK_WEBHOOK_URL")
+
+    if not webhook_url:
+        print("SLACK_WEBHOOK_URL environment variable not set")
+        return False
+
+    # Create Block Kit message for Slack (similar to adaptive cards)
+    color = "#FF0000" if status == "down" else "#00FF00"
+    emoji = "🚨" if status == "down" else "✅"
+
+    message = {
+        "blocks": [
+            {
+                "type": "header",
+                "text": {
+                    "type": "plain_text",
+                    "text": f"{emoji} Domain Alert: {domain}",
+                    "emoji": True,
+                },
+            },
+            {
+                "type": "section",
+                "fields": [
+                    {"type": "mrkdwn", "text": f"*Domain:*\n{domain}"},
+                    {"type": "mrkdwn", "text": f"*Status:*\n{status.upper()}"},
+                    {"type": "mrkdwn", "text": f"*Timestamp:*\n{timestamp}"},
+                ],
+            },
+            {
+                "type": "context",
+                "elements": [{"type": "mrkdwn", "text": f"Monitored by AWS Lambda"}],
+            },
+        ],
+        "attachments": [{"color": color, "fallback": f"Domain {domain} is {status}"}],
+    }
+
+    try:
+        req = Request(
+            webhook_url,
+            data=json.dumps(message).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+        )
+        response = urlopen(req)
+        print(f"Slack notification sent: {response.read().decode()}")
+        return True
+    except HTTPError as e:
+        print(f"Failed to send Slack notification - HTTP Error: {e.code} {e.reason}")
+        return False
+    except URLError as e:
+        print(f"Failed to send Slack notification - URL Error: {e.reason}")
+        return False
+    except Exception as e:
+        print(f"Failed to send Slack notification: {e}")
+        return False
+
+
 def send_teams_notification(domain, status, timestamp):
     """Send notification to Microsoft Teams channel via webhook"""
     webhook_url = os.environ.get("TEAMS_WEBHOOK_URL")
@@ -84,5 +142,8 @@ def lambda_handler(event, context):
 
         # Send Teams notification
         send_teams_notification(domain, "down", timestamp)
+
+        # Send Slack notification
+        send_slack_notification(domain, "down", timestamp)
 
         return {"statusCode": 500, "body": message}
