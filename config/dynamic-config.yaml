@@ -24,6 +24,6 @@ runtime:
     ecr_uri: 010382427026.dkr.ecr.ap-southeast-1.amazonaws.com/aws-cloudops-agent:latest
     endpoint_arn: arn:aws:bedrock-agentcore:ap-southeast-1:010382427026:runtime/aws_cloudops_agent-t6rEDA5h0K/runtime-endpoint/DEFAULT
   q_agent:
-    arn: arn:aws:bedrock-agentcore:ap-southeast-1:010382427026:runtime/test_agentcore_agent-07j1198j5o
-    ecr_uri: 010382427026.dkr.ecr.ap-southeast-1.amazonaws.com/bedrock-agentcore-test_agentcore_agent:latest
+    arn: ''
+    ecr_uri: ''
     endpoint_arn: ''
