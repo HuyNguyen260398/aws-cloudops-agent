@@ -1,0 +1,22 @@
+# 1. Bucket lưu trữ Artifact (Lambda ZIP files)
+data "aws_s3_bucket" "rag_artifacts" {
+  bucket = var.artifact_bucket_name
+}
+
+# 2. Bucket lưu trữ Documents (Tài liệu nguồn cho RAG)
+resource "aws_s3_bucket" "rag_documents" {
+  bucket = "${var.project}-documents-${data.aws_caller_identity.current.account_id}"
+  tags = { Name = "${var.project}-documents" }
+}
+
+# Lấy ID Account để tạo tên Bucket duy nhất
+data "aws_caller_identity" "current" {}
+
+# Bảo mật cho Bucket Documents
+resource "aws_s3_bucket_public_access_block" "rag_documents_block" {
+  bucket = aws_s3_bucket.rag_documents.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}

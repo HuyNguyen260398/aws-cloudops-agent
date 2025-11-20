@@ -1,0 +1,46 @@
+name: CI - Build Lambda & Upload Artifacts
+
+on:
+  push:
+    branches: ["feature/pipeline"]
+  workflow_dispatch: 
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    # Config AWS CLI
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ vars.AWS_REGION }} 
+
+    # 1. Build Lambda Ingest
+    - name: Build ingest lambda
+      run: |
+        cd assets/ingest_lambda
+        # Cài đặt dependency vào thư mục gốc của code
+        # pip install -r requirements.txt -t .
+        zip -r ingest.zip .
+        cd ../../
+    - name: Upload ingest artifact
+      run: |
+        aws s3 cp assets/ingest_lambda/ingest.zip \
+          s3://${{ secrets.ARTIFACT_BUCKET }}/ingest-${{ github.sha }}.zip
+
+    # 2. Build Lambda Retrieve
+    - name: Build retrieve lambda
+      run: |
+        cd assets/retrieve_lambda
+        # pip install -r requirements.txt -t .
+        zip -r retrieve.zip .
+        cd ../../
+    - name: Upload retrieve artifact
+      run: |
+        aws s3 cp assets/retrieve_lambda/retrieve.zip \
+          s3://${{ secrets.ARTIFACT_BUCKET }}/retrieve-${{ github.sha }}.zip
