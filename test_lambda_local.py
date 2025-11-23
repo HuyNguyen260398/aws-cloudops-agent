@@ -22,7 +22,7 @@ os.environ["AWS_REGION"] = "ap-southeast-1"
 os.environ["AWS_DEFAULT_REGION"] = "ap-southeast-1"
 
 # Import the lambda function
-from src.lambda_ping_monitor import lambda_handler
+from src.ops.lambda_ping_monitor import lambda_handler
 
 
 class MockContext:

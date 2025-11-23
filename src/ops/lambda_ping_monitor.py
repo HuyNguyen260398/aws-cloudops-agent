@@ -8,6 +8,7 @@ import urllib.parse
 from datetime import datetime
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
+from decimal import Decimal
 
 
 def get_cognito_jwt_token(username, password, client_id, region):
@@ -147,8 +148,88 @@ IMPORTANT: Start your response with a clear executive summary of the root cause 
         return None
 
 
-def send_slack_notification(domain, status, timestamp, agent_analysis=None):
-    """Send notification to Slack channel via webhook using adaptive card format"""
+def extract_executive_summary(agent_analysis):
+    """Extract executive summary from agent analysis for Slack preview"""
+    if not agent_analysis:
+        return None
+
+    # Look for executive summary section
+    summary_markers = [
+        "EXECUTIVE SUMMARY",
+        "ROOT CAUSE",
+        "IMMEDIATE ACTIONS",
+        "CRITICAL FINDINGS",
+    ]
+
+    lines = agent_analysis.split("\n")
+    summary_lines = []
+    in_summary = False
+    section_count = 0
+
+    for line in lines:
+        # Check if we hit a summary section
+        if any(marker in line.upper() for marker in summary_markers):
+            in_summary = True
+            section_count += 1
+            summary_lines.append(line)
+            # Stop after capturing 2-3 key sections
+            if section_count >= 3:
+                break
+            continue
+
+        # If in summary section, keep adding lines
+        if in_summary:
+            # Stop at next major section or after reasonable length
+            if line.startswith("##") and section_count > 1:
+                break
+            if len("\n".join(summary_lines)) > 1500:
+                summary_lines.append("\n_[Summary continues...]_")
+                break
+            summary_lines.append(line)
+
+    return "\n".join(summary_lines) if summary_lines else agent_analysis[:1500]
+
+
+def store_alert_data(
+    alert_id, domain, status, timestamp, error_details, agent_analysis
+):
+    """Store alert data in DynamoDB for approval workflow"""
+    dynamodb_table = os.environ.get("DYNAMODB_ALERTS_TABLE")
+
+    if not dynamodb_table:
+        print("DYNAMODB_ALERTS_TABLE environment variable not set")
+        return False
+
+    try:
+        dynamodb = boto3.resource("dynamodb")
+        table = dynamodb.Table(dynamodb_table)
+
+        table.put_item(
+            Item={
+                "alert_id": alert_id,
+                "domain": domain,
+                "status": status,
+                "timestamp": timestamp,
+                "error_details": error_details,
+                "agent_analysis": agent_analysis if agent_analysis else "N/A",
+                "approval_status": "pending",
+                "ttl": int(datetime.now().timestamp()) + 86400,  # Expire after 24 hours
+            }
+        )
+        print(f"Alert data stored in DynamoDB with ID: {alert_id}")
+        print(
+            f"Full analysis length: {len(agent_analysis) if agent_analysis else 0} characters"
+        )
+        return True
+    except Exception as e:
+        print(f"Failed to store alert data in DynamoDB: {e}")
+        return False
+
+
+def send_slack_notification(
+    domain, status, timestamp, agent_analysis=None, alert_id=None
+):
+    """Send notification to Slack channel via webhook using adaptive card format with approval button"""
     webhook_url = os.environ.get("SLACK_WEBHOOK_URL")
 
     if not webhook_url:
@@ -165,7 +246,7 @@ def send_slack_notification(domain, status, timestamp, agent_analysis=None):
             "text": {
                 "type": "plain_text",
                 "text": f"{status_prefix}: Domain Alert - {domain}",
-                "emoji": False,
+                "emoji": True,
             },
         },
         {
@@ -174,6 +255,7 @@ def send_slack_notification(domain, status, timestamp, agent_analysis=None):
                 {"type": "mrkdwn", "text": f"*Domain:*\n{domain}"},
                 {"type": "mrkdwn", "text": f"*Status:*\n{status.upper()}"},
                 {"type": "mrkdwn", "text": f"*Timestamp:*\n{timestamp}"},
+                {"type": "mrkdwn", "text": f"*Alert ID:*\n`{alert_id}`"},
             ],
         },
     ]
@@ -181,20 +263,121 @@ def send_slack_notification(domain, status, timestamp, agent_analysis=None):
     # Add agent analysis if available
     if agent_analysis:
         blocks.append({"type": "divider"})
-        blocks.append(
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": f"*AI Agent Analysis:*\n{agent_analysis[:2800]}",
+
+        # Extract executive summary for preview
+        summary_text = extract_executive_summary(agent_analysis)
+        full_length = len(agent_analysis)
+
+        # If analysis is very long, show summary + link to full version
+        if full_length > 2000:
+            # Limit summary to 1800 chars to leave room for other content
+            if len(summary_text) > 1800:
+                summary_text = summary_text[:1800]
+
+            blocks.append(
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"*🤖 AI Agent Analysis (Summary):*\n{summary_text}",
+                    },
+                }
+            )
+
+            # Add context showing full analysis is available
+            blocks.append(
+                {
+                    "type": "context",
+                    "elements": [
+                        {
+                            "type": "mrkdwn",
+                            "text": f"📄 Full analysis: {full_length:,} characters | Complete details stored in DynamoDB",
+                        }
+                    ],
+                }
+            )
+        else:
+            # For shorter analysis, show it all
+            blocks.append(
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"*🤖 AI Agent Analysis:*\n{agent_analysis}",
+                    },
+                }
+            )
+
+        # Add approval button only if status is down and agent analysis is available
+        if status == "down":
+            blocks.append({"type": "divider"})
+            blocks.append(
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "*Review the agent's analysis and approve to execute remediation actions:*",
+                    },
+                }
+            )
+
+            # Add buttons for actions
+            action_elements = [
+                {
+                    "type": "button",
+                    "text": {
+                        "type": "plain_text",
+                        "text": "✅ Approve & Execute",
+                        "emoji": True,
+                    },
+                    "style": "primary",
+                    "value": alert_id,
+                    "action_id": f"approve_remediation_{alert_id}",
                 },
-            }
-        )
+                {
+                    "type": "button",
+                    "text": {
+                        "type": "plain_text",
+                        "text": "❌ Dismiss",
+                        "emoji": True,
+                    },
+                    "style": "danger",
+                    "value": alert_id,
+                    "action_id": f"dismiss_alert_{alert_id}",
+                },
+            ]
+
+            # Add "View Full Analysis" button if analysis was truncated
+            if full_length > 2000:
+                action_elements.append(
+                    {
+                        "type": "button",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "📄 View Full Analysis",
+                            "emoji": True,
+                        },
+                        "value": alert_id,
+                        "action_id": f"view_full_analysis_{alert_id}",
+                    }
+                )
+
+            blocks.append(
+                {
+                    "type": "actions",
+                    "elements": action_elements,
+                }
+            )
 
     blocks.append(
         {
             "type": "context",
-            "elements": [{"type": "mrkdwn", "text": "Monitored by AWS Lambda"}],
+            "elements": [
+                {
+                    "type": "mrkdwn",
+                    "text": "🔍 Monitored by AWS Lambda | Powered by AI CloudOps Agent",
+                }
+            ],
         }
     )
 
@@ -291,16 +474,35 @@ def lambda_handler(event, context):
         # Test DNS resolution and connectivity
         socket.gethostbyname(domain)
         print(f"{domain} is reachable at {timestamp}")
+        raise Exception("Simulated unreachable domain for testing purposes")
         return {"statusCode": 200, "body": f"{domain} is healthy"}
 
-    except socket.gaierror as e:
+    # except socket.gaierror as e:
+    except Exception as e:
         # Domain unreachable - send alerts
         error_details = str(e)
         message = f"ALERT: {domain} is unreachable at {timestamp}"
         print(message)
 
+        # Generate unique alert ID
+        alert_id = str(uuid.uuid4())
+
         # Invoke AI agent for analysis
-        agent_analysis = invoke_agent_for_analysis(domain, timestamp, error_details)
+        # agent_analysis = invoke_agent_for_analysis(domain, timestamp, error_details)
+        # Read sample agent analysis from file for testing
+        try:
+            with open('agent_response.txt', 'r', encoding='utf-8') as f:
+                agent_analysis = f.read()
+        except FileNotFoundError:
+            agent_analysis = "Simulated agent analysis for testing purposes."
+        except Exception as e:
+            print(f"Error reading agent_response.txt: {e}")
+            agent_analysis = "Simulated agent analysis for testing purposes."
+
+        # Store alert data in DynamoDB for approval workflow
+        # store_alert_data(
+        #     alert_id, domain, "down", timestamp, error_details, agent_analysis
+        # )
 
         # Send SNS notification
         sns = boto3.client("sns")
@@ -311,6 +513,7 @@ def lambda_handler(event, context):
                 email_message = message
                 if agent_analysis:
                     email_message += f"\n\nAI Agent Analysis:\n{agent_analysis}"
+                    email_message += f"\n\nAlert ID: {alert_id}"
 
                 sns.publish(
                     TopicArn=sns_topic_arn,
@@ -326,11 +529,12 @@ def lambda_handler(event, context):
         # Send Teams notification with agent analysis
         send_teams_notification(domain, "down", timestamp, agent_analysis)
 
-        # Send Slack notification with agent analysis
-        send_slack_notification(domain, "down", timestamp, agent_analysis)
+        # Send Slack notification with agent analysis and approval button
+        send_slack_notification(domain, "down", timestamp, agent_analysis, alert_id)
 
         return {
             "statusCode": 500,
             "body": message,
+            "alert_id": alert_id,
             "agent_analysis": agent_analysis if agent_analysis else "Not available",
         }
