@@ -2,21 +2,24 @@ name: CD - Terraform Apply
 
 on:
   workflow_dispatch:
-  workflow_run:
-    workflows: ["CI - Build Lambda & Upload Artifacts"]
-    types: [completed]
+  push:
     branches:
-      - main
-      - feature/pipeline 
+      - feature/pipeline
+  # Uncomment below after testing to enable automatic CD trigger
+  # workflow_run:
+  #   workflows: ["CI - Build Lambda & Upload Artifacts"]
+  #   types: [completed]
+  #   branches:
+  #     - main
+  #     - feature/pipeline 
 
 env:
-  COMMIT_SHA: ${{ github.event.workflow_run.head_sha || github.sha }} 
+  COMMIT_SHA: ${{ github.sha }} 
 
   ARTIFACT_BUCKET: ${{ secrets.ARTIFACT_BUCKET }} 
 
 jobs:
   deploy:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: self-hosted
 
     steps:
