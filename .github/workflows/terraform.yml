@@ -1,12 +1,12 @@
 name: CD - Terraform Apply
 
 on:
-  workflow_dispatch: 
+  workflow_dispatch:
   workflow_run:
-    workflows: ["CI - Build Lambda & Upload Artifacts"] 
+    workflows: ["CI - Build Lambda & Upload Artifacts"]
     types: [completed]
     branches:
-      # - main
+      - main
       - feature/pipeline 
 
 env:
