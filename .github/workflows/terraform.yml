@@ -58,10 +58,11 @@ jobs:
     # 1. Terraform Init (with retry for proxy timeout)
     - name: Terraform Init
       run: |
+        # Unset CA bundle variables to disable SSL verification
+        unset AWS_CA_BUNDLE
+        unset SSL_CERT_FILE
+        unset REQUESTS_CA_BUNDLE
         export AWS_SDK_LOAD_CONFIG=1
-        export SSL_CERT_FILE=/dev/null
-        export AWS_CA_BUNDLE=/dev/null
-        export REQUESTS_CA_BUNDLE=/dev/null
         for i in 1 2 3; do
           if terraform -chdir=modules init -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" -backend-config="skip_credentials_validation=true" -backend-config="skip_metadata_api_check=true"; then
             exit 0
@@ -77,6 +78,27 @@ jobs:
         TF_VAR_skip_ssl_validation: true
         TF_HTTP_SSL_VERIFY: "false"
         TF_IGNORE_REMOTE_VERSION: "true"
+
+    # 1.5. Clean up conflicting resources
+    - name: Remove existing Lambda permission and S3 notification
+      run: |
+        # Remove the existing Lambda permission from AWS if it exists
+        echo "Removing Lambda permission..."
+        aws lambda remove-permission \
+          --function-name rag-agent-system-ingest \
+          --statement-id AllowS3Invoke \
+          --region ap-southeast-2 2>/dev/null || echo "Lambda permission does not exist or already removed"
+
+        # Remove S3 bucket notification configuration
+        echo "Clearing S3 bucket notifications..."
+        aws s3api put-bucket-notification-configuration \
+          --bucket rag-agent-system-documents \
+          --notification-configuration '{}' \
+          --region ap-southeast-2 2>/dev/null || echo "S3 notification does not exist or already removed"
+      continue-on-error: true
+      env:
+        AWS_REGION: ${{ vars.AWS_REGION }}
+        NODE_TLS_REJECT_UNAUTHORIZED: '0'
 
     # 2. Terraform Plan
     - name: Terraform Plan
@@ -97,10 +119,11 @@ jobs:
     # 3. Terraform Apply
     - name: Terraform Apply
       run: |
+        # Unset CA bundle variables to disable SSL verification
+        unset AWS_CA_BUNDLE
+        unset SSL_CERT_FILE
+        unset REQUESTS_CA_BUNDLE
         export AWS_SDK_LOAD_CONFIG=1
-        export SSL_CERT_FILE=/dev/null
-        export AWS_CA_BUNDLE=/dev/null
-        export REQUESTS_CA_BUNDLE=/dev/null
         terraform -chdir=modules apply -auto-approve tfplan
       env:
         AWS_REGION: ${{ vars.AWS_REGION }}
