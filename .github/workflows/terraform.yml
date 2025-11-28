@@ -39,11 +39,13 @@ jobs:
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v2
 
-    # 1. Terraform Init 
+    # 1. Terraform Init
     - name: Terraform Init
       run: terraform -chdir=modules init -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}"
       env:
         AWS_REGION: ${{ vars.AWS_REGION }}
+        AWS_CA_BUNDLE: ""
+        NODE_TLS_REJECT_UNAUTHORIZED: '0'
 
     # 2. Terraform Plan
     - name: Terraform Plan
@@ -51,10 +53,12 @@ jobs:
         terraform -chdir=modules plan -out=tfplan \
           -var "ingest_artifact_key=ingest-${{ env.COMMIT_SHA }}.zip" \
           -var "retrieve_artifact_key=retrieve-${{ env.COMMIT_SHA }}.zip" \
-          -var "artifact_bucket_name=${{ env.ARTIFACT_BUCKET }}" 
-          
+          -var "artifact_bucket_name=${{ env.ARTIFACT_BUCKET }}"
+
       env:
         AWS_REGION: ${{ vars.AWS_REGION }}
+        AWS_CA_BUNDLE: ""
+        NODE_TLS_REJECT_UNAUTHORIZED: '0'
 
     # 3. Terraform Apply
     - name: Terraform Apply
@@ -62,3 +66,5 @@ jobs:
         terraform -chdir=modules apply -auto-approve tfplan
       env:
         AWS_REGION: ${{ vars.AWS_REGION }}
+        AWS_CA_BUNDLE: ""
+        NODE_TLS_REJECT_UNAUTHORIZED: '0'
