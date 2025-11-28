@@ -24,7 +24,6 @@ jobs:
     - name: Build ingest lambda
       run: |
         cd assets/ingest_lambda
-        # Cài đặt dependency vào thư mục gốc của code
         # pip install -r requirements.txt -t .
         zip -r ingest.zip .
         cd ../../

@@ -6,7 +6,7 @@ on:
     workflows: ["CI - Build Lambda & Upload Artifacts"] 
     types: [completed]
     branches:
-      # - main
+      - main
       - feature/pipeline 
 
 env:

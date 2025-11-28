@@ -8,14 +8,19 @@ terraform {
 
   # Cấu hình Backend S3 cho Terraform State
   backend "s3" {
-    bucket         = "test-rag-agent-bucket" # THAY THẾ bằng tên Bucket S3 duy nhất của bạn
+    bucket         = "test-rag-agent-bucket"
     key            = "rag-agent/terraform.tfstate"
-    region         = "ap-southeast-1"           # THAY THẾ bằng region chính
+    region         = "ap-southeast-1"        
     encrypt        = true
   }
 }
 
 provider "aws" {
   region = var.region
+}
+
+provider "aws" {
+  alias  = "bedrock"
+  region = var.bedrock_region
 }
 

@@ -33,8 +33,24 @@ resource "aws_iam_role_policy" "kb_policy" {
       # Quyền OpenSearch Serverless
       {
         Effect = "Allow"
-        Action = ["aoss:APIAccessAll"] 
+        Action = ["aoss:APIAccessAll"]
         Resource = aws_opensearchserverless_collection.rag_collection.arn
+      },
+      # Quyền Bedrock Model Invocation
+      {
+        Effect = "Allow"
+        Action = ["bedrock:InvokeModel"]
+        Resource = "arn:aws:bedrock:${var.bedrock_region}::foundation-model/*"
+      },
+      # AWS Marketplace permissions for Cohere model
+      {
+        Effect = "Allow"
+        Action = [
+          "aws-marketplace:Subscribe",
+          "aws-marketplace:ViewSubscriptions",
+          "aws-marketplace:Unsubscribe"
+        ]
+        Resource = "*"
       }
     ]
   })
@@ -42,6 +58,7 @@ resource "aws_iam_role_policy" "kb_policy" {
 
 # Bedrock Knowledge Base
 resource "aws_bedrockagent_knowledge_base" "kb" {
+  provider    = aws.bedrock
   name        = "${var.project}-kb"
   description = "Knowledge Base for RAG"
   role_arn    = aws_iam_role.kb_service_role.arn
@@ -49,7 +66,7 @@ resource "aws_bedrockagent_knowledge_base" "kb" {
   knowledge_base_configuration {
     type = "VECTOR"
     vector_knowledge_base_configuration {
-      embedding_model_arn = "arn:aws:bedrock:${var.region}::foundation-model/amazon.titan-embed-text-v2:0"
+      embedding_model_arn = "arn:aws:bedrock:${var.bedrock_region}::foundation-model/amazon.titan-embed-text-v2:0"
     }
   }
 
@@ -71,15 +88,24 @@ resource "aws_bedrockagent_knowledge_base" "kb" {
   ]
 }
 
-# Data Source (Kết nối S3 Documents với KB)
+# Data Source
 resource "aws_bedrockagent_data_source" "docs_data_source" {
-  name               = "docs-data-source"
-  knowledge_base_id  = aws_bedrockagent_knowledge_base.kb.id
+  provider              = aws.bedrock
+  name                  = "docs-data-source"
+  knowledge_base_id     = aws_bedrockagent_knowledge_base.kb.id
+  data_deletion_policy  = "RETAIN"  # Keep OpenSearch data when data source is deleted/updated
+
   data_source_configuration {
     type = "S3"
     s3_configuration {
       bucket_arn = aws_s3_bucket.rag_documents.arn
-      inclusion_prefixes = ["docs/"] 
+      inclusion_prefixes = ["docs/"]
     }
+  }
+
+  lifecycle {
+    replace_triggered_by = [
+      aws_bedrockagent_knowledge_base.kb.id
+    ]
   }
 }

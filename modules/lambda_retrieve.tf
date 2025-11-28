@@ -1,13 +1,20 @@
-# Lambda Retriever (Sử dụng Artifact ZIP từ GitHub Actions)
+# Lambda Retriever - HTTP API endpoint for KB retrieval (for testing/external access)
+# Use inline code for simplicity
+
+data "archive_file" "lambda_retrieve_zip" {
+  type        = "zip"
+  source_dir  = "${path.module}/../assets/retrieve_lambda"
+  output_path = "${path.module}/../build/lambda_retrieve.zip"
+}
+
 resource "aws_lambda_function" "retrieve" {
   function_name = "${var.project}-retrieve"
   role          = aws_iam_role.lambda_exec.arn
   handler       = "lambda_handler.lambda_handler"
   runtime       = "python3.12"
 
-  s3_bucket = data.aws_s3_bucket.rag_artifacts.bucket
-  # Key được truyền từ GitHub Actions
-  s3_key    = var.retrieve_artifact_key
+  filename         = data.archive_file.lambda_retrieve_zip.output_path
+  source_code_hash = data.archive_file.lambda_retrieve_zip.output_base64sha256
 
   timeout     = 30
   memory_size = 1024
@@ -15,7 +22,7 @@ resource "aws_lambda_function" "retrieve" {
   environment {
     variables = {
       KNOWLEDGE_BASE_ID = aws_bedrockagent_knowledge_base.kb.id
-      REGION = var.region
+      REGION            = var.bedrock_region
     }
   }
 }
