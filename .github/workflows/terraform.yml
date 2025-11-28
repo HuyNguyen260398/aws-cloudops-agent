@@ -39,9 +39,17 @@ jobs:
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v2
 
-    # 1. Terraform Init
+    # 1. Terraform Init (with retry for proxy timeout)
     - name: Terraform Init
-      run: terraform -chdir=modules init -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}"
+      run: |
+        for i in 1 2 3; do
+          if terraform -chdir=modules init -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}"; then
+            exit 0
+          fi
+          echo "Terraform init failed, retrying... (attempt $i/3)"
+          sleep 5
+        done
+        exit 1
       env:
         AWS_REGION: ${{ vars.AWS_REGION }}
         AWS_CA_BUNDLE: ""
