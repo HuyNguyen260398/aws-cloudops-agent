@@ -10,13 +10,19 @@ terraform {
     }
   }
 
-  # Cấu hình Backend S3 cho Terraform State
-  backend "s3" {
-    bucket         = "test-rag-agent-bucket"
-    key            = "rag-agent/terraform.tfstate"
-    region         = "ap-southeast-1"        
-    encrypt        = true
+  # Use local backend temporarily due to proxy SSL issues
+  # Switch back to S3 backend after proxy is properly configured
+  backend "local" {
+    path = "terraform.tfstate"
   }
+
+  # Original S3 backend (commented out due to proxy SSL issues)
+  # backend "s3" {
+  #   bucket         = "test-rag-agent-bucket"
+  #   key            = "rag-agent/terraform.tfstate"
+  #   region         = "ap-southeast-1"
+  #   encrypt        = true
+  # }
 }
 
 provider "aws" {

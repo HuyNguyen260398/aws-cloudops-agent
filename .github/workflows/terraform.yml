@@ -63,8 +63,10 @@ jobs:
         unset SSL_CERT_FILE
         unset REQUESTS_CA_BUNDLE
         export AWS_SDK_LOAD_CONFIG=1
+
+        # Using local backend, no S3 bucket config needed
         for i in 1 2 3; do
-          if terraform -chdir=modules init -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" -backend-config="skip_credentials_validation=true" -backend-config="skip_metadata_api_check=true"; then
+          if terraform -chdir=modules init; then
             exit 0
           fi
           echo "Terraform init failed, retrying... (attempt $i/3)"
@@ -132,3 +134,14 @@ jobs:
         TF_VAR_skip_ssl_validation: true
         TF_HTTP_SSL_VERIFY: "false"
         TF_IGNORE_REMOTE_VERSION: "true"
+
+    # 4. Backup Terraform state to S3 (using AWS CLI which can handle the proxy)
+    - name: Backup Terraform State to S3
+      if: success()
+      run: |
+        echo "Backing up Terraform state to S3..."
+        aws s3 cp modules/terraform.tfstate s3://${{ secrets.TF_STATE_BUCKET }}/rag-agent/terraform.tfstate
+        echo "State file backed up successfully to S3"
+      env:
+        AWS_REGION: ap-southeast-1
+        NODE_TLS_REJECT_UNAUTHORIZED: '0'
