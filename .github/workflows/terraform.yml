@@ -1,16 +1,17 @@
 name: CD - Terraform Apply
 
 on:
-  workflow_dispatch: 
+  workflow_dispatch:
   push:
     branches:
       - feature/pipeline
+  # Uncomment below after testing to enable automatic CD trigger
   # workflow_run:
-  #   workflows: ["CI - Build Lambda & Upload Artifacts"] 
+  #   workflows: ["CI - Build Lambda & Upload Artifacts"]
   #   types: [completed]
   #   branches:
   #     - main
-  #     - feature/rag_pipeline 
+  #     - feature/pipeline 
 
 env:
   COMMIT_SHA: ${{ github.sha }} 
@@ -30,17 +31,31 @@ jobs:
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ vars.AWS_REGION }} 
+        aws-region: ${{ vars.AWS_REGION }}
+      env:
+        NODE_TLS_REJECT_UNAUTHORIZED: '0' 
 
     # Install Terraform
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v2
 
-    # 1. Terraform Init 
+    # 1. Terraform Init (with retry for proxy timeout)
     - name: Terraform Init
-      run: terraform -chdir=modules init -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}"
+      run: |
+        for i in 1 2 3; do
+          if terraform -chdir=modules init -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}"; then
+            exit 0
+          fi
+          echo "Terraform init failed, retrying... (attempt $i/3)"
+          sleep 5
+        done
+        exit 1
       env:
         AWS_REGION: ${{ vars.AWS_REGION }}
+        AWS_CA_BUNDLE: ""
+        NODE_TLS_REJECT_UNAUTHORIZED: '0'
+        AWS_EC2_METADATA_DISABLED: true
+        TF_VAR_skip_ssl_validation: true
 
     # 2. Terraform Plan
     - name: Terraform Plan
@@ -48,10 +63,14 @@ jobs:
         terraform -chdir=modules plan -out=tfplan \
           -var "ingest_artifact_key=ingest-${{ env.COMMIT_SHA }}.zip" \
           -var "retrieve_artifact_key=retrieve-${{ env.COMMIT_SHA }}.zip" \
-          -var "artifact_bucket_name=${{ env.ARTIFACT_BUCKET }}" 
-          
+          -var "artifact_bucket_name=${{ env.ARTIFACT_BUCKET }}"
+
       env:
         AWS_REGION: ${{ vars.AWS_REGION }}
+        AWS_CA_BUNDLE: ""
+        NODE_TLS_REJECT_UNAUTHORIZED: '0'
+        AWS_EC2_METADATA_DISABLED: true
+        TF_VAR_skip_ssl_validation: true
 
     # 3. Terraform Apply
     - name: Terraform Apply
@@ -59,3 +78,7 @@ jobs:
         terraform -chdir=modules apply -auto-approve tfplan
       env:
         AWS_REGION: ${{ vars.AWS_REGION }}
+        AWS_CA_BUNDLE: ""
+        NODE_TLS_REJECT_UNAUTHORIZED: '0'
+        AWS_EC2_METADATA_DISABLED: true
+        TF_VAR_skip_ssl_validation: true
