@@ -36,9 +36,9 @@ resource "aws_iam_role_policy" "lambda_policy" {
         Resource = "arn:aws:logs:*:*:*"
       },
 
-      # S3 Bucket Access
+      # S3 Documents Bucket Access
       {
-        Sid    = "S3Access"
+        Sid    = "S3DocumentsAccess"
         Effect = "Allow"
         Action = [
           "s3:GetObject",
@@ -46,9 +46,7 @@ resource "aws_iam_role_policy" "lambda_policy" {
           "s3:PutObject",
         ]
         Resource = [
-          "${data.aws_s3_bucket.rag_artifacts.arn}/*",
           "${aws_s3_bucket.rag_documents.arn}/*",
-          data.aws_s3_bucket.rag_artifacts.arn,
           aws_s3_bucket.rag_documents.arn,
         ]
       },
