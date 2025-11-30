@@ -53,7 +53,17 @@ jobs:
         git config --global http.sslVerify false
       shell: bash
 
-    # 1. Terraform Init (with retry for proxy timeout)
+    # 1. Restore Terraform state from S3 (if exists)
+    - name: Restore Terraform state from S3
+      run: |
+        echo "Restoring Terraform state from S3..."
+        aws s3 cp s3://${{ secrets.TF_STATE_BUCKET }}/rag-agent/terraform.tfstate modules/terraform.tfstate 2>/dev/null || echo "No existing state file found in S3, will start fresh"
+      continue-on-error: true
+      env:
+        AWS_REGION: ap-southeast-1
+        NODE_TLS_REJECT_UNAUTHORIZED: '0'
+
+    # 2. Terraform Init (with retry for proxy timeout)
     - name: Terraform Init
       run: |
         # Unset CA bundle variables to disable SSL verification
@@ -79,9 +89,8 @@ jobs:
         TF_HTTP_SSL_VERIFY: "false"
         TF_IGNORE_REMOTE_VERSION: "true"
 
-    # 1.5. Import existing resources into Terraform state (disabled - all resources already in state)
+    # 3. Import existing resources into Terraform state
     - name: Import existing resources into Terraform state
-      if: false  # Disabled - all resources already imported
       run: |
         echo "Importing existing AWS resources into Terraform state..."
 
