@@ -84,7 +84,22 @@ resource "aws_bedrockagent_knowledge_base" "kb" {
   }
 
   depends_on = [
-    null_resource.create_index
+    null_resource.create_index,
+    aws_opensearchserverless_access_policy.rag_data_access,
+    aws_iam_role_policy.kb_policy,
+    null_resource.wait_for_permissions
+  ]
+}
+
+# Wait for IAM and OpenSearch permissions to propagate
+resource "null_resource" "wait_for_permissions" {
+  provisioner "local-exec" {
+    command = "echo 'Waiting for IAM and OpenSearch permissions to propagate...' && sleep 30"
+  }
+
+  depends_on = [
+    aws_opensearchserverless_access_policy.rag_data_access,
+    aws_iam_role_policy.kb_policy
   ]
 }
 

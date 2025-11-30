@@ -82,21 +82,38 @@ jobs:
         TF_IGNORE_REMOTE_VERSION: "true"
 
     # 1.5. Clean up conflicting resources
-    - name: Remove existing Lambda permission and S3 notification
+    - name: Remove existing resources that conflict with Terraform
       run: |
-        # Remove the existing Lambda permission from AWS if it exists
+        echo "Cleaning up existing AWS resources..."
+
+        # Remove S3 bucket notification first
+        echo "Clearing S3 bucket notifications..."
+        aws s3api put-bucket-notification-configuration \
+          --bucket rag-agent-system-documents \
+          --notification-configuration '{}' \
+          --region ap-southeast-2 2>/dev/null || echo "S3 notification does not exist or already removed"
+
+        # Remove Lambda permission
         echo "Removing Lambda permission..."
         aws lambda remove-permission \
           --function-name rag-agent-system-ingest \
           --statement-id AllowS3Invoke \
           --region ap-southeast-2 2>/dev/null || echo "Lambda permission does not exist or already removed"
 
-        # Remove S3 bucket notification configuration
-        echo "Clearing S3 bucket notifications..."
-        aws s3api put-bucket-notification-configuration \
-          --bucket rag-agent-system-documents \
-          --notification-configuration '{}' \
-          --region ap-southeast-2 2>/dev/null || echo "S3 notification does not exist or already removed"
+        # Delete Lambda functions if they exist
+        echo "Deleting Lambda function: rag-agent-system-ingest..."
+        aws lambda delete-function \
+          --function-name rag-agent-system-ingest \
+          --region ap-southeast-2 2>/dev/null || echo "Lambda ingest does not exist or already removed"
+
+        echo "Deleting Lambda function: rag-agent-system-retrieve..."
+        aws lambda delete-function \
+          --function-name rag-agent-system-retrieve \
+          --region ap-southeast-2 2>/dev/null || echo "Lambda retrieve does not exist or already removed"
+
+        # Wait a moment for deletions to propagate
+        sleep 5
+        echo "Cleanup complete"
       continue-on-error: true
       env:
         AWS_REGION: ${{ vars.AWS_REGION }}
