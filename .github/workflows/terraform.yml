@@ -264,7 +264,7 @@ jobs:
 
         # Update the config file
         cd ..
-        sed -i "s/id: \".*\"  # Will be set by Terraform or manually after KB deployment/id: \"$KB_ID\"  # Auto-updated by Terraform/" config/static-config.yaml
+        sed -i "s|id: \".*\"  # Will be set by Terraform or manually after KB deployment|id: \"$KB_ID\"  # Auto-updated by Terraform|" config/static-config.yaml
 
         echo "Knowledge Base ID updated in config/static-config.yaml"
       env:
