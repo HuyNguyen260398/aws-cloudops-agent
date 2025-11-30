@@ -262,9 +262,16 @@ jobs:
         KB_ID=$(terraform output -raw knowledge_base_id)
         echo "Knowledge Base ID: $KB_ID"
 
-        # Update the config file
+        # Update the config file using awk (safe for special characters)
         cd ..
-        sed -i "s|id: \".*\"  # Will be set by Terraform or manually after KB deployment|id: \"$KB_ID\"  # Auto-updated by Terraform|" config/static-config.yaml
+        awk -v kb="$KB_ID" '
+          BEGIN { q = "\""}
+          /^id: .*# Will be set by Terraform or manually after KB deployment/ {
+            print "id: " q kb q "  # Auto-updated by Terraform"
+            next
+          }
+          { print }
+        ' config/static-config.yaml > config/static-config.yaml.tmp && mv config/static-config.yaml.tmp config/static-config.yaml
 
         echo "Knowledge Base ID updated in config/static-config.yaml"
       env:
