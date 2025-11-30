@@ -1,6 +1,6 @@
 # Lambda Ingestion - triggers KB ingestion when files uploaded to S3
 # MUST be in same region as S3 Documents bucket (ap-southeast-2) for S3 event trigger
-# Use inline code to avoid cross-region S3 bucket access issues
+# Uses local code (builds on terraform apply)
 
 data "archive_file" "lambda_ingest_zip" {
   type        = "zip"

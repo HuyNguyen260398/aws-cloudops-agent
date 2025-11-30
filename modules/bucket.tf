@@ -1,9 +1,4 @@
-# 1. Bucket lưu trữ Artifact (Lambda ZIP files)
-data "aws_s3_bucket" "rag_artifacts" {
-  bucket = var.artifact_bucket_name
-}
-
-# 2. Bucket lưu trữ Documents (Tài liệu nguồn cho RAG) - in Bedrock region (ap-southeast-2)
+# Bucket lưu trữ Documents (Tài liệu nguồn cho RAG) - in Bedrock region (ap-southeast-2)
 resource "aws_s3_bucket" "rag_documents" {
   provider = aws.bedrock
   bucket = "${var.project}-documents-${var.bedrock_region}-${data.aws_caller_identity.current.account_id}"

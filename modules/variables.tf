@@ -16,17 +16,3 @@ variable "bedrock_region" {
   default     = "ap-southeast-2"
 }
 
-variable "artifact_bucket_name" {
-  description = "Tên S3 Bucket để lưu trữ các Artifact (zip files)."
-  type        = string
-}
-
-variable "ingest_artifact_key" {
-  description = "Key S3 của file zip Lambda Ingest mới nhất."
-  type        = string
-}
-
-variable "retrieve_artifact_key" {
-  description = "Key S3 của file zip Lambda Retrieve mới nhất."
-  type        = string
-}
