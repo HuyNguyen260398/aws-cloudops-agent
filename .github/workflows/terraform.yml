@@ -36,6 +36,8 @@ jobs:
     # Install Terraform
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v2
+      with:
+        terraform_wrapper: false  # Disable wrapper to get clean output
 
     # Configure system to bypass SSL for AWS
     - name: Configure system for proxy SSL bypass

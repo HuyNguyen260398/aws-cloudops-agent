@@ -1,4 +1,4 @@
-# IAM Role cho Bedrock Knowledge Base (Assume Role: bedrock.amazonaws.com)
+# IAM Role for Bedrock Knowledge Base (Assume Role: bedrock.amazonaws.com)
 resource "aws_iam_role" "kb_service_role" {
   name = "${var.project}-kb-service-role"
 
@@ -16,7 +16,7 @@ resource "aws_iam_role" "kb_service_role" {
   })
 }
 
-# Policy cho phép KB truy cập S3 và OpenSearch
+# Policy permit KB to access S3 bucket and Opensreach
 resource "aws_iam_role_policy" "kb_policy" {
   name = "${var.project}-kb-policy"
   role = aws_iam_role.kb_service_role.id
@@ -24,19 +24,19 @@ resource "aws_iam_role_policy" "kb_policy" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
-      # Quyền S3 (Documents Bucket)
+      # Right of S3 bucker (Documents Bucket)
       {
         Effect = "Allow"
         Action = ["s3:GetObject", "s3:ListBucket"]
         Resource = [aws_s3_bucket.rag_documents.arn, "${aws_s3_bucket.rag_documents.arn}/*"]
       },
-      # Quyền OpenSearch Serverless
+      # Right OpenSearch Serverless
       {
         Effect = "Allow"
         Action = ["aoss:APIAccessAll"]
         Resource = aws_opensearchserverless_collection.rag_collection.arn
       },
-      # Quyền Bedrock Model Invocation
+      # Right Bedrock Model Invocation
       {
         Effect = "Allow"
         Action = ["bedrock:InvokeModel"]
