@@ -50,6 +50,7 @@ config_manager = AgentCoreConfigManager()
 
 # Get configuration values
 base_config = config_manager.get_base_settings()
+dynamic_config = config_manager.get_dynamic_config()
 merged_config = (
     config_manager.get_merged_config()
 )  # For runtime values that may be dynamic
@@ -75,6 +76,10 @@ COGNITO_DISCOVERY_URL = cognito_config["discovery_url"]
 # print(f"   🌐 User Pool ID: {COGNITO_USER_POOL_ID}")
 # print(f"   🆔 Client ID: {COGNITO_CLIENT_ID}")
 # print(f"   🔍 Discovery URL: {COGNITO_DISCOVERY_URL}")
+
+# Knowledge base configuration
+KNOWLEDGE_BASE_ID = base_config["knowledge_base"]["id"]
+MODEL_ARN = dynamic_config["runtime"]["p_agent"]["arn"]
 
 # sys.exit(0)
 
@@ -135,6 +140,8 @@ try:
                     "AWS_REGION": env_vars.get("AWS_REGION", REGION),
                     "COGNITO_USERNAME": env_vars.get("COGNITO_USERNAME", ""),
                     "COGNITO_PASSWORD": env_vars.get("COGNITO_PASSWORD", ""),
+                    "KNOWLEDGE_BASE_ID": KNOWLEDGE_BASE_ID,
+                    "BEDROCK_REGION": "ap-southeast-2",
                 },
             )
 

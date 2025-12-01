@@ -24,6 +24,7 @@ class AwsCloudOpsAgent(Agent):
 
 Your capabilities:
 - Retrieve information about AWS services and resources
+- Search and retrieve documents from the Knowledge Base using retrieve_from_knowledge_base or quick_kb_search tools
 - Provide architecture solutions based on user scenarios
 - Offer best practices and recommendations
 - Help troubleshoot AWS-related issues
@@ -94,10 +95,12 @@ EXECUTION WORKFLOW:
 
 TOOL USAGE STRATEGY:
 1. **AWS tools**: Execute one atomic operation at a time
-2. **handoff_to_user**: Always use for user confirmation before any resource changes
-3. **get_current_time**: Use when time-based queries are needed
-4. **echo_message**: Use for progress announcements if streaming isn't working 
-5. **stop**: Use if you exceed 15 tool calls with a summary
+2. **retrieve_from_knowledge_base**: Use when searching for specific documentation or stored knowledge (returns multiple results with details)
+3. **quick_kb_search**: Use for quick lookups when you only need the top result
+4. **handoff_to_user**: Always use for user confirmation before any resource changes
+5. **get_current_time**: Use when time-based queries are needed
+6. **echo_message**: Use for progress announcements if streaming isn't working
+7. **stop**: Use if you exceed 15 tool calls with a summary
 
 PROGRESS INDICATORS (MANDATORY):
 - 🤔 Thinking/Planning

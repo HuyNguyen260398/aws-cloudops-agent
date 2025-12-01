@@ -1,0 +1,312 @@
+name: CD - Terraform Apply
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/pipeline
+  # Uncomment below after testing to enable automatic CD trigger
+  # workflow_run:
+  #   workflows: ["CI - Build Lambda & Upload Artifacts"]
+  #   types: [completed]
+  #   branches:
+  #     - main
+  #     - feature/pipeline 
+
+env:
+  COMMIT_SHA: ${{ github.sha }} 
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+    - uses: actions/checkout@v3
+
+    # Config AWS
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ vars.AWS_REGION }}
+      env:
+        NODE_TLS_REJECT_UNAUTHORIZED: '0' 
+
+    # Install Terraform
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v2
+      with:
+        terraform_wrapper: false  # Disable wrapper to get clean output
+
+    # Configure system to bypass SSL for AWS
+    - name: Configure system for proxy SSL bypass
+      run: |
+        # Disable SSL verification system-wide for this session
+        export NODE_TLS_REJECT_UNAUTHORIZED=0
+
+        # Create Terraform RC to configure provider behavior
+        mkdir -p ~/.terraform.d
+        cat > ~/.terraformrc << 'EOF'
+        disable_checkpoint = true
+        EOF
+
+        # Configure git to not check SSL (for potential git operations)
+        git config --global http.sslVerify false
+      shell: bash
+
+    # 1. Restore Terraform state from S3 (if exists)
+    - name: Restore Terraform state from S3
+      run: |
+        echo "Restoring Terraform state from S3..."
+        aws s3 cp s3://${{ secrets.TF_STATE_BUCKET }}/rag-agent/terraform.tfstate modules/terraform.tfstate 2>/dev/null || echo "No existing state file found in S3, will start fresh"
+      continue-on-error: true
+      env:
+        AWS_REGION: ap-southeast-1
+        NODE_TLS_REJECT_UNAUTHORIZED: '0'
+
+    # 2. Terraform Init (with retry for proxy timeout)
+    - name: Terraform Init
+      run: |
+        # Unset CA bundle variables to disable SSL verification
+        unset AWS_CA_BUNDLE
+        unset SSL_CERT_FILE
+        unset REQUESTS_CA_BUNDLE
+        export AWS_SDK_LOAD_CONFIG=1
+
+        # Using local backend, no S3 bucket config needed
+        for i in 1 2 3; do
+          if terraform -chdir=modules init; then
+            exit 0
+          fi
+          echo "Terraform init failed, retrying... (attempt $i/3)"
+          sleep 5
+        done
+        exit 1
+      env:
+        AWS_REGION: ${{ vars.AWS_REGION }}
+        NODE_TLS_REJECT_UNAUTHORIZED: '0'
+        AWS_EC2_METADATA_DISABLED: true
+        TF_VAR_skip_ssl_validation: true
+        TF_HTTP_SSL_VERIFY: "false"
+        TF_IGNORE_REMOTE_VERSION: "true"
+
+    # 3. Import existing resources into Terraform state
+    - name: Import existing resources into Terraform state
+      run: |
+        echo "Importing existing AWS resources into Terraform state..."
+
+        # Unset CA bundle variables
+        unset AWS_CA_BUNDLE
+        unset SSL_CERT_FILE
+        unset REQUESTS_CA_BUNDLE
+
+        # Get AWS Account ID
+        AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+        echo "AWS Account ID: $AWS_ACCOUNT_ID"
+
+        cd modules
+
+        # Import S3 bucket
+        if ! terraform state show aws_s3_bucket.rag_documents &>/dev/null; then
+          terraform import -var "ingest_artifact_key=ingest-${{ env.COMMIT_SHA }}.zip" \
+            -var "artifact_bucket_name=${{ env.ARTIFACT_BUCKET }}" \
+            aws_s3_bucket.rag_documents "rag-agent-system-documents-ap-southeast-2-${AWS_ACCOUNT_ID}" 2>/dev/null || echo "S3 bucket not found or already imported"
+        else
+          echo "S3 bucket already in state, skipping import"
+        fi
+
+        # Import IAM roles
+        if ! terraform state show aws_iam_role.lambda_exec &>/dev/null; then
+          terraform import -var "ingest_artifact_key=ingest-${{ env.COMMIT_SHA }}.zip" \
+            -var "artifact_bucket_name=${{ env.ARTIFACT_BUCKET }}" \
+            aws_iam_role.lambda_exec "rag-agent-system-lambda-exec-role" 2>/dev/null || echo "Lambda exec role not found"
+        else
+          echo "Lambda exec role already in state, skipping import"
+        fi
+
+        if ! terraform state show aws_iam_role.kb_service_role &>/dev/null; then
+          terraform import -var "ingest_artifact_key=ingest-${{ env.COMMIT_SHA }}.zip" \
+            -var "artifact_bucket_name=${{ env.ARTIFACT_BUCKET }}" \
+            aws_iam_role.kb_service_role "rag-agent-system-kb-service-role" 2>/dev/null || echo "KB service role not found"
+        else
+          echo "KB service role already in state, skipping import"
+        fi
+
+        # Import Lambda ingest function
+        if ! terraform state show aws_lambda_function.ingest &>/dev/null; then
+          AWS_REGION=ap-southeast-2 terraform import -var "ingest_artifact_key=ingest-${{ env.COMMIT_SHA }}.zip" \
+            -var "artifact_bucket_name=${{ env.ARTIFACT_BUCKET }}" \
+            aws_lambda_function.ingest "rag-agent-system-ingest" 2>/dev/null || echo "Lambda ingest not found"
+        else
+          echo "Lambda ingest already in state, skipping import"
+        fi
+
+        # Import OpenSearch policies (format: name/type)
+        if ! terraform state show aws_opensearchserverless_security_policy.encryption_policy &>/dev/null; then
+          AWS_REGION=ap-southeast-2 terraform import -var "ingest_artifact_key=ingest-${{ env.COMMIT_SHA }}.zip" \
+            -var "artifact_bucket_name=${{ env.ARTIFACT_BUCKET }}" \
+            aws_opensearchserverless_security_policy.encryption_policy 'rag-agent-system-encrypt-policy/encryption' 2>/dev/null || echo "Encryption policy not found"
+        else
+          echo "Encryption policy already in state, skipping import"
+        fi
+
+        if ! terraform state show aws_opensearchserverless_security_policy.network_policy &>/dev/null; then
+          AWS_REGION=ap-southeast-2 terraform import -var "ingest_artifact_key=ingest-${{ env.COMMIT_SHA }}.zip" \
+            -var "artifact_bucket_name=${{ env.ARTIFACT_BUCKET }}" \
+            aws_opensearchserverless_security_policy.network_policy 'rag-agent-system-network-policy/network' 2>/dev/null || echo "Network policy not found"
+        else
+          echo "Network policy already in state, skipping import"
+        fi
+
+        # Import OpenSearch Serverless Collection
+        if ! terraform state show aws_opensearchserverless_collection.rag_collection &>/dev/null; then
+          COLLECTION_ID=$(aws opensearchserverless list-collections --region ap-southeast-2 --query "collectionSummaries[?name=='rag-agent-system-kb-collection'].id" --output text 2>/dev/null || echo "")
+          if [ -n "$COLLECTION_ID" ]; then
+            echo "Found OpenSearch collection ID: $COLLECTION_ID"
+            AWS_REGION=ap-southeast-2 terraform import -var "ingest_artifact_key=ingest-${{ env.COMMIT_SHA }}.zip" \
+              -var "artifact_bucket_name=${{ env.ARTIFACT_BUCKET }}" \
+              aws_opensearchserverless_collection.rag_collection "$COLLECTION_ID" 2>/dev/null || echo "Collection import failed"
+          else
+            echo "OpenSearch collection not found"
+          fi
+        else
+          echo "OpenSearch collection already in state, skipping import"
+        fi
+
+        # Import OpenSearch Access Policy
+        if ! terraform state show aws_opensearchserverless_access_policy.rag_data_access &>/dev/null; then
+          AWS_REGION=ap-southeast-2 terraform import -var "ingest_artifact_key=ingest-${{ env.COMMIT_SHA }}.zip" \
+            -var "artifact_bucket_name=${{ env.ARTIFACT_BUCKET }}" \
+            aws_opensearchserverless_access_policy.rag_data_access 'rag-agent-system-kb-access/data' 2>/dev/null || echo "Access policy not found"
+        else
+          echo "Access policy already in state, skipping import"
+        fi
+
+        # Import Knowledge Base
+        KB_ID=$(aws bedrock-agent list-knowledge-bases --region ap-southeast-2 --query "knowledgeBaseSummaries[?name=='rag-agent-system-kb'].knowledgeBaseId" --output text 2>/dev/null || echo "")
+        if [ -n "$KB_ID" ]; then
+          echo "Found Knowledge Base ID: $KB_ID"
+          # Check if already in state before importing
+          if ! terraform state show aws_bedrockagent_knowledge_base.kb &>/dev/null; then
+            AWS_REGION=ap-southeast-2 terraform import -var "ingest_artifact_key=ingest-${{ env.COMMIT_SHA }}.zip" \
+                  -var "artifact_bucket_name=${{ env.ARTIFACT_BUCKET }}" \
+              aws_bedrockagent_knowledge_base.kb "$KB_ID" 2>/dev/null || echo "Knowledge Base import failed"
+          else
+            echo "Knowledge Base already in state, skipping import"
+          fi
+        else
+          echo "Knowledge Base not found or cannot list"
+        fi
+
+        # Import Data Source if KB exists
+        if [ -n "$KB_ID" ]; then
+          DATA_SOURCE_ID=$(aws bedrock-agent list-data-sources --knowledge-base-id "$KB_ID" --region ap-southeast-2 --query "dataSourceSummaries[?name=='docs-data-source'].dataSourceId" --output text 2>/dev/null || echo "")
+          if [ -n "$DATA_SOURCE_ID" ]; then
+            echo "Found Data Source ID: $DATA_SOURCE_ID"
+            # Check if already in state before importing
+            if ! terraform state show aws_bedrockagent_data_source.docs_data_source &>/dev/null; then
+              AWS_REGION=ap-southeast-2 terraform import -var "ingest_artifact_key=ingest-${{ env.COMMIT_SHA }}.zip" \
+                      -var "artifact_bucket_name=${{ env.ARTIFACT_BUCKET }}" \
+                aws_bedrockagent_data_source.docs_data_source "${KB_ID},${DATA_SOURCE_ID}" 2>/dev/null || echo "Data Source import failed"
+            else
+              echo "Data Source already in state, skipping import"
+            fi
+          else
+            echo "Data Source not found"
+          fi
+        fi
+
+        cd ..
+        echo "Import complete"
+      continue-on-error: true
+      env:
+        AWS_REGION: ${{ vars.AWS_REGION }}
+        NODE_TLS_REJECT_UNAUTHORIZED: '0'
+        AWS_EC2_METADATA_DISABLED: true
+
+    # 2. Terraform Plan
+    - name: Terraform Plan
+      run: |
+        terraform -chdir=modules plan -out=tfplan
+
+      env:
+        AWS_REGION: ${{ vars.AWS_REGION }}
+        NODE_TLS_REJECT_UNAUTHORIZED: '0'
+        AWS_EC2_METADATA_DISABLED: true
+        TF_VAR_skip_ssl_validation: true
+        TF_HTTP_SSL_VERIFY: "false"
+        TF_IGNORE_REMOTE_VERSION: "true"
+
+    # 3. Terraform Apply
+    - name: Terraform Apply
+      run: |
+        # Unset CA bundle variables to disable SSL verification
+        unset AWS_CA_BUNDLE
+        unset SSL_CERT_FILE
+        unset REQUESTS_CA_BUNDLE
+        export AWS_SDK_LOAD_CONFIG=1
+        terraform -chdir=modules apply -auto-approve tfplan
+      env:
+        AWS_REGION: ${{ vars.AWS_REGION }}
+        NODE_TLS_REJECT_UNAUTHORIZED: '0'
+        AWS_EC2_METADATA_DISABLED: true
+        TF_VAR_skip_ssl_validation: true
+        TF_HTTP_SSL_VERIFY: "false"
+        TF_IGNORE_REMOTE_VERSION: "true"
+
+    # 4. Update Knowledge Base ID in config
+    - name: Update Knowledge Base ID in config
+      if: success()
+      run: |
+        echo "Extracting Knowledge Base ID from Terraform output..."
+        cd modules
+        KB_ID=$(terraform output -raw knowledge_base_id)
+        echo "Knowledge Base ID: $KB_ID"
+
+        # Update the config file using awk (safe for special characters)
+        cd ..
+        awk -v kb="$KB_ID" '
+          BEGIN { q = "\""}
+          /^  id: .*# Will be set by Terraform or manually after KB deployment/ {
+            print "  id: " q kb q "  # Auto-updated by Terraform"
+            next
+          }
+          { print }
+        ' config/static-config.yaml > config/static-config.yaml.tmp && mv config/static-config.yaml.tmp config/static-config.yaml
+
+        echo "Knowledge Base ID updated in config/static-config.yaml"
+      env:
+        AWS_REGION: ${{ vars.AWS_REGION }}
+        NODE_TLS_REJECT_UNAUTHORIZED: '0'
+
+    # 5. Commit and push updated config file
+    - name: Commit and push updated KB ID
+      if: success()
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+
+        # Check if there are changes to commit
+        if git diff --quiet config/static-config.yaml; then
+          echo "No changes to KB ID in config file"
+        else
+          git add config/static-config.yaml
+          git commit -m "Update KB ID to $(cd modules && terraform output -raw knowledge_base_id) [skip ci]"
+          git push
+          echo "KB ID changes committed and pushed"
+        fi
+      env:
+        AWS_REGION: ${{ vars.AWS_REGION }}
+        NODE_TLS_REJECT_UNAUTHORIZED: '0'
+
+    # 6. Backup Terraform state to S3 (using AWS CLI which can handle the proxy)
+    - name: Backup Terraform State to S3
+      if: success()
+      run: |
+        echo "Backing up Terraform state to S3..."
+        aws s3 cp modules/terraform.tfstate s3://${{ secrets.TF_STATE_BUCKET }}/rag-agent/terraform.tfstate
+        echo "State file backed up successfully to S3"
+      env:
+        AWS_REGION: ap-southeast-1
+        NODE_TLS_REJECT_UNAUTHORIZED: '0'
