@@ -280,7 +280,27 @@ jobs:
         AWS_REGION: ${{ vars.AWS_REGION }}
         NODE_TLS_REJECT_UNAUTHORIZED: '0'
 
-    # 5. Backup Terraform state to S3 (using AWS CLI which can handle the proxy)
+    # 5. Commit and push updated config file
+    - name: Commit and push updated KB ID
+      if: success()
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+
+        # Check if there are changes to commit
+        if git diff --quiet config/static-config.yaml; then
+          echo "No changes to KB ID in config file"
+        else
+          git add config/static-config.yaml
+          git commit -m "Update KB ID to $(cd modules && terraform output -raw knowledge_base_id) [skip ci]"
+          git push
+          echo "KB ID changes committed and pushed"
+        fi
+      env:
+        AWS_REGION: ${{ vars.AWS_REGION }}
+        NODE_TLS_REJECT_UNAUTHORIZED: '0'
+
+    # 6. Backup Terraform state to S3 (using AWS CLI which can handle the proxy)
     - name: Backup Terraform State to S3
       if: success()
       run: |
