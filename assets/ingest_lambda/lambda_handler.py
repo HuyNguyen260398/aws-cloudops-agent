@@ -65,11 +65,12 @@ def lambda_handler(event, context):
         }
     except Exception as e:
         print(f"Error starting ingestion: {str(e)}")
-        return {
-            'statusCode': 500,
-            'body': json.dumps({
-                'error': str(e),
-                'triggerSource': trigger_source,
-                'uploadedFiles': uploaded_files if uploaded_files else 'N/A'
-            })
-        }
+        raise e
+        # return {
+        #     'statusCode': 500,
+        #     'body': json.dumps({
+        #         'error': str(e),
+        #         'triggerSource': trigger_source,
+        #         'uploadedFiles': uploaded_files if uploaded_files else 'N/A'
+        #     })
+        # }
