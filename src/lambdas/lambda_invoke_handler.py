@@ -1,9 +1,9 @@
 """
-Lambda Function: Invoke Agent for Analysis
-Main endpoint to detect issues, invoke agent, and distribute notifications
+Lambda Function: General AWS Service Analysis Handler
+Receives service issue details from upstream monitors and invokes AI agent for analysis
+Supports multiple AWS services: Route53, CloudFront, S3, EC2, RDS, Lambda, etc.
 """
 
-import socket
 import boto3
 import json
 import os
@@ -31,26 +31,34 @@ def get_cognito_jwt_token(username, password, client_id, region):
         return None
 
 
-def construct_analysis_prompt(domain, timestamp, error_details, context=None):
+def construct_analysis_prompt(service_name, timestamp, error_details, context=None):
     """
     Create comprehensive analysis prompt with structured output requirements
-    Enhanced version from best practices document
+    Supports any AWS service with dynamic context
     """
-    prompt = f"""URGENT: Domain monitoring alert requires immediate analysis.
+    # Build infrastructure context from provided details
+    infrastructure_context = ""
+    if context:
+        if isinstance(context, dict):
+            if context.get("aws_services"):
+                infrastructure_context = "\n\n**Infrastructure Context:**\n"
+                for idx, service in enumerate(context["aws_services"], 1):
+                    infrastructure_context += f"{idx}. {service}\n"
+
+            if context.get("additional_info"):
+                infrastructure_context += (
+                    f"\n**Additional Information:**\n{context['additional_info']}\n"
+                )
+        elif isinstance(context, str):
+            infrastructure_context = f"\n\n**Infrastructure Context:**\n{context}\n"
+
+    prompt = f"""URGENT: AWS Service monitoring alert requires immediate analysis.
 
 **Incident Details:**
-- Domain: {domain}
-- Status: UNREACHABLE
+- Service/Resource: {service_name}
+- Status: ISSUE DETECTED
 - Timestamp: {timestamp}
-- Error: {error_details}
-
-**Infrastructure Context:**
-This website uses the following AWS services:
-1. Amazon Route 53 for DNS management
-2. Amazon CloudFront as the Content Delivery Network (CDN)
-3. AWS Certificate Manager (ACM) for SSL/TLS certificates
-4. Amazon S3 for static website hosting
-5. AWS WAF for web application security
+- Error: {error_details}{infrastructure_context}
 
 **Analysis Requirements:**
 
@@ -94,8 +102,10 @@ This website uses the following AWS services:
     return prompt
 
 
-def invoke_agent_for_analysis(domain, timestamp, error_details, session_id=None):
-    """Invoke AWS CloudOps Agent to analyze domain issue"""
+def invoke_agent_for_analysis(
+    service_name, timestamp, error_details, context=None, session_id=None
+):
+    """Invoke AWS CloudOps Agent to analyze any AWS service issue"""
     runtime_arn = os.environ.get("AGENT_RUNTIME_ARN")
     region = os.environ.get(
         "AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "ap-southeast-1")
@@ -108,7 +118,7 @@ def invoke_agent_for_analysis(domain, timestamp, error_details, session_id=None)
         print("Warning: Agent configuration incomplete. Skipping agent analysis.")
         return None, None
 
-    print("Invoking AWS CloudOps Agent for analysis...")
+    print(f"Invoking AWS CloudOps Agent for {service_name} analysis...")
 
     try:
         # Get JWT token
@@ -128,8 +138,10 @@ def invoke_agent_for_analysis(domain, timestamp, error_details, session_id=None)
         if not session_id:
             session_id = str(uuid.uuid4())
 
-        # Construct enhanced analysis prompt
-        prompt = construct_analysis_prompt(domain, timestamp, error_details)
+        # Construct enhanced analysis prompt with context
+        prompt = construct_analysis_prompt(
+            service_name, timestamp, error_details, context
+        )
 
         headers = {
             "Authorization": f"Bearer {jwt_token}",
@@ -269,7 +281,9 @@ def summarize_agent_analysis(agent_analysis):
     return summary
 
 
-def upload_analysis_to_s3(alert_id, domain, timestamp, agent_analysis):
+def upload_analysis_to_s3(
+    alert_id, service_name, timestamp, agent_analysis, service_type="general"
+):
     """Upload full analysis to S3 bucket and return the URL"""
     s3_bucket = os.environ.get("S3_ANALYSIS_BUCKET")
 
@@ -281,18 +295,23 @@ def upload_analysis_to_s3(alert_id, domain, timestamp, agent_analysis):
         s3_client = boto3.client("s3")
         region = os.environ.get("AWS_REGION", "ap-southeast-1")
 
-        # Create filename with timestamp
+        # Create filename with timestamp and service type
         date_str = datetime.now().strftime("%Y-%m-%d")
         time_str = datetime.now().strftime("%H-%M-%S")
-        filename = f"alerts/{date_str}/{domain}/{time_str}-{alert_id}.md"
+        # Sanitize service_name for use in path
+        safe_service_name = (
+            service_name.replace("/", "-").replace(":", "-").replace(" ", "-")
+        )
+        filename = f"alerts/{date_str}/{service_type}/{safe_service_name}/{time_str}-{alert_id}.md"
 
         # Format analysis as markdown
-        markdown_content = f"""# Domain Alert Analysis Report
+        markdown_content = f"""# AWS Service Analysis Report
 
 **Alert ID:** {alert_id}  
-**Domain:** {domain}  
+**Service/Resource:** {service_name}  
+**Service Type:** {service_type}  
 **Timestamp:** {timestamp}  
-**Status:** UNREACHABLE
+**Status:** ISSUE DETECTED
 
 ---
 
@@ -312,7 +331,8 @@ def upload_analysis_to_s3(alert_id, domain, timestamp, agent_analysis):
             ContentType="text/markdown",
             Metadata={
                 "alert-id": alert_id,
-                "domain": domain,
+                "service-name": safe_service_name,
+                "service-type": service_type,
                 "timestamp": timestamp,
             },
         )
@@ -330,13 +350,17 @@ def upload_analysis_to_s3(alert_id, domain, timestamp, agent_analysis):
 
 def store_alert_in_dynamodb(
     alert_id,
-    domain,
+    service_name,
     timestamp,
     error_details,
     agent_analysis,
     agent_session_id,
     s3_url,
     s3_key,
+    service_type="general",
+    issue_type="service_issue",
+    severity="high",
+    additional_metadata=None,
 ):
     """Store alert metadata in DynamoDB for workflow tracking"""
     dynamodb_table = os.environ.get("DYNAMODB_ALERTS_TABLE")
@@ -349,26 +373,31 @@ def store_alert_in_dynamodb(
         dynamodb = boto3.resource("dynamodb")
         table = dynamodb.Table(dynamodb_table)
 
-        # Determine severity based on error type
-        severity = "critical" if "dns" in error_details.lower() else "high"
+        # Build DynamoDB item
+        item = {
+            "alert_id": alert_id,
+            "timestamp": timestamp,
+            "service_name": service_name,
+            "service_type": service_type,
+            "issue_type": issue_type,
+            "error_details": error_details,
+            "agent_session_id": agent_session_id,
+            "agent_analysis": summarize_agent_analysis(agent_analysis)[:1000],
+            "s3_analysis_url": s3_url,
+            "s3_analysis_key": s3_key,
+            "approval_status": "pending",
+            "execution_status": "not_started",
+            "severity": severity,
+            "ttl": int(datetime.now().timestamp()) + (7 * 86400),  # 7 days
+        }
 
-        table.put_item(
-            Item={
-                "alert_id": alert_id,
-                "timestamp": timestamp,
-                "domain": domain,
-                "issue_type": "dns_failure",
-                "error_details": error_details,
-                "agent_session_id": agent_session_id,
-                "agent_analysis": summarize_agent_analysis(agent_analysis)[:1000],
-                "s3_analysis_url": s3_url,
-                "s3_analysis_key": s3_key,
-                "approval_status": "pending",
-                "execution_status": "not_started",
-                "severity": severity,
-                "ttl": int(datetime.now().timestamp()) + (7 * 86400),  # 7 days
-            }
-        )
+        # Add any additional metadata from upstream
+        if additional_metadata and isinstance(additional_metadata, dict):
+            for key, value in additional_metadata.items():
+                if key not in item:  # Don't override core fields
+                    item[key] = value
+
+        table.put_item(Item=item)
         print(f"Alert {alert_id} stored in DynamoDB")
         return True
     except Exception as e:
@@ -376,7 +405,14 @@ def store_alert_in_dynamodb(
         return False
 
 
-def send_sns_notification(domain, timestamp, alert_id, agent_analysis, s3_url):
+def send_sns_notification(
+    service_name,
+    timestamp,
+    alert_id,
+    agent_analysis,
+    s3_url,
+    service_type="AWS Service",
+):
     """Send email notification via SNS"""
     sns_topic_arn = os.environ.get("SNS_TOPIC_ARN")
 
@@ -388,7 +424,8 @@ def send_sns_notification(domain, timestamp, alert_id, agent_analysis, s3_url):
         sns = boto3.client("sns")
         summary = summarize_agent_analysis(agent_analysis)
 
-        email_message = f"""ALERT: {domain} is unreachable at {timestamp}
+        email_message = f"""ALERT: {service_type} issue detected - {service_name}
+Timestamp: {timestamp}
 
 AI Agent Analysis Summary:
 {summary}
@@ -400,7 +437,7 @@ Alert ID: {alert_id}
 
         sns.publish(
             TopicArn=sns_topic_arn,
-            Subject=f"Domain Alert: {domain} Down",
+            Subject=f"{service_type} Alert: {service_name}",
             Message=email_message,
         )
         print("Email notification sent via SNS")
@@ -410,7 +447,15 @@ Alert ID: {alert_id}
         return False
 
 
-def send_teams_notification(domain, timestamp, agent_analysis, alert_id, s3_url):
+def send_teams_notification(
+    service_name,
+    timestamp,
+    agent_analysis,
+    alert_id,
+    s3_url,
+    service_type="AWS Service",
+    status="ISSUE DETECTED",
+):
     """Send notification to Microsoft Teams with Adaptive Card"""
     webhook_url = os.environ.get("TEAMS_WEBHOOK_URL")
 
@@ -426,15 +471,16 @@ def send_teams_notification(domain, timestamp, agent_analysis, alert_id, s3_url)
             "type": "TextBlock",
             "size": "Large",
             "weight": "Bolder",
-            "text": f"⚠️ Domain Alert: {domain}",
+            "text": f"⚠️ {service_type} Alert: {service_name}",
             "wrap": True,
             "color": "Attention",
         },
         {
             "type": "FactSet",
             "facts": [
-                {"title": "Domain:", "value": domain},
-                {"title": "Status:", "value": "DOWN"},
+                {"title": "Service/Resource:", "value": service_name},
+                {"title": "Type:", "value": service_type},
+                {"title": "Status:", "value": status},
                 {"title": "Timestamp:", "value": timestamp},
                 {"title": "Alert ID:", "value": alert_id},
             ],
@@ -518,7 +564,15 @@ def send_teams_notification(domain, timestamp, agent_analysis, alert_id, s3_url)
         return False
 
 
-def send_slack_notification(domain, timestamp, agent_analysis, alert_id, s3_url):
+def send_slack_notification(
+    service_name,
+    timestamp,
+    agent_analysis,
+    alert_id,
+    s3_url,
+    service_type="AWS Service",
+    status="ISSUE DETECTED",
+):
     """Send notification to Slack via webhook"""
     webhook_url = os.environ.get("SLACK_WEBHOOK_URL")
 
@@ -533,15 +587,16 @@ def send_slack_notification(domain, timestamp, agent_analysis, alert_id, s3_url)
             "type": "header",
             "text": {
                 "type": "plain_text",
-                "text": f"ALERT: Domain Alert - {domain}",
+                "text": f"ALERT: {service_type} - {service_name}",
                 "emoji": True,
             },
         },
         {
             "type": "section",
             "fields": [
-                {"type": "mrkdwn", "text": f"*Domain:*\n{domain}"},
-                {"type": "mrkdwn", "text": "*Status:*\nDOWN"},
+                {"type": "mrkdwn", "text": f"*Service/Resource:*\n{service_name}"},
+                {"type": "mrkdwn", "text": f"*Type:*\n{service_type}"},
+                {"type": "mrkdwn", "text": f"*Status:*\n{status}"},
                 {"type": "mrkdwn", "text": f"*Timestamp:*\n{timestamp}"},
                 {"type": "mrkdwn", "text": f"*Alert ID:*\n`{alert_id}`"},
             ],
@@ -569,7 +624,12 @@ def send_slack_notification(domain, timestamp, agent_analysis, alert_id, s3_url)
 
     message = {
         "blocks": blocks,
-        "attachments": [{"color": "#FF0000", "fallback": f"Domain {domain} is down"}],
+        "attachments": [
+            {
+                "color": "#FF0000",
+                "fallback": f"{service_type} {service_name} - {status}",
+            }
+        ],
     }
 
     try:
@@ -588,38 +648,56 @@ def send_slack_notification(domain, timestamp, agent_analysis, alert_id, s3_url)
 
 def lambda_handler(event, context):
     """
-    Main Lambda handler for agent analysis invocation
-    Triggered by EventBridge scheduled rule or CloudWatch alarm
+    Main Lambda handler for general AWS service analysis
+    Receives service issue details from upstream monitoring Lambda functions
+
+    Expected Event Structure:
+    {
+        "service_name": "my-cloudfront-distribution" or "my-domain.com",
+        "service_type": "CloudFront" or "Route53" or "EC2" etc.,
+        "error_details": "Description of the error",
+        "issue_type": "distribution_error" or "dns_failure" etc.,
+        "severity": "critical" or "high" or "medium" or "low",
+        "status": "DOWN" or "DEGRADED" or "ERROR",
+        "context": {
+            "aws_services": ["List of related AWS services"],
+            "additional_info": "Any additional context"
+        },
+        "metadata": {"key": "value"}  // Optional additional metadata
+    }
     """
-    # Extract domain from event or use default
-    domain = event.get("domain", os.environ.get("MONITORED_DOMAIN", "nghuy.link"))
     timestamp = datetime.now().isoformat()
 
-    print(f"Starting domain monitoring for: {domain}")
+    # Extract service details from event
+    service_name = event.get("service_name")
+    service_type = event.get("service_type", "AWS Service")
+    error_details = event.get("error_details", "Unknown error")
+    issue_type = event.get("issue_type", "service_issue")
+    severity = event.get("severity", "high")
+    status = event.get("status", "ISSUE DETECTED")
+    service_context = event.get("context", None)
+    additional_metadata = event.get("metadata", None)
 
-    try:
-        # Test DNS resolution and connectivity
-        socket.gethostbyname(domain)
-        print(f"{domain} is reachable at {timestamp}")
+    # Validate required fields
+    if not service_name:
+        print("ERROR: service_name is required in event")
         return {
-            "statusCode": 200,
-            "body": json.dumps(
-                {"message": f"{domain} is healthy", "timestamp": timestamp}
-            ),
+            "statusCode": 400,
+            "body": json.dumps({"error": "service_name is required"}),
         }
 
-    except socket.gaierror as e:
-        # Domain unreachable - trigger analysis workflow
-        error_details = str(e)
-        print(f"ALERT: {domain} is unreachable - {error_details}")
+    print(f"Starting analysis for {service_type}: {service_name}")
+    print(f"Issue: {error_details}")
+    print(f"Severity: {severity}")
 
+    try:
         # Generate unique alert ID
         alert_id = str(uuid.uuid4())
 
-        # Invoke AI agent for analysis
+        # Invoke AI agent for analysis with context
         print("Invoking agent for comprehensive analysis...")
         agent_analysis, agent_session_id = invoke_agent_for_analysis(
-            domain, timestamp, error_details
+            service_name, timestamp, error_details, service_context
         )
 
         if not agent_analysis:
@@ -629,42 +707,65 @@ def lambda_handler(event, context):
 
         # Upload full analysis to S3
         s3_url, s3_key = upload_analysis_to_s3(
-            alert_id, domain, timestamp, agent_analysis
+            alert_id, service_name, timestamp, agent_analysis, service_type
         )
 
         # Store alert metadata in DynamoDB
         store_alert_in_dynamodb(
             alert_id,
-            domain,
+            service_name,
             timestamp,
             error_details,
             agent_analysis,
             agent_session_id,
             s3_url,
             s3_key,
+            service_type,
+            issue_type,
+            severity,
+            additional_metadata,
         )
 
         # Send notifications to all channels
         print("Sending notifications...")
 
         # Email via SNS
-        send_sns_notification(domain, timestamp, alert_id, agent_analysis, s3_url)
+        send_sns_notification(
+            service_name, timestamp, alert_id, agent_analysis, s3_url, service_type
+        )
 
         # Teams with Adaptive Card
-        send_teams_notification(domain, timestamp, agent_analysis, alert_id, s3_url)
+        send_teams_notification(
+            service_name,
+            timestamp,
+            agent_analysis,
+            alert_id,
+            s3_url,
+            service_type,
+            status,
+        )
 
         # Slack (if configured)
-        send_slack_notification(domain, timestamp, agent_analysis, alert_id, s3_url)
+        send_slack_notification(
+            service_name,
+            timestamp,
+            agent_analysis,
+            alert_id,
+            s3_url,
+            service_type,
+            status,
+        )
 
         return {
-            "statusCode": 500,
+            "statusCode": 200,
             "body": json.dumps(
                 {
-                    "message": f"{domain} is unreachable",
+                    "message": f"Analysis completed for {service_type}: {service_name}",
                     "alert_id": alert_id,
                     "timestamp": timestamp,
                     "s3_url": s3_url,
                     "agent_session_id": agent_session_id,
+                    "severity": severity,
                 }
             ),
         }
