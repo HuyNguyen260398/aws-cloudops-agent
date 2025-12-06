@@ -30,6 +30,7 @@ from agents.aws_cloudops_agent import AwsCloudOpsAgent
 from utils.config_manager import AgentCoreConfigManager
 from utils.query_extractor import extract_tool_query
 from components.gateway import tool_search
+from tools.kb_retrieval import retrieve_from_knowledge_base, quick_kb_search
 
 from utils.responses import (
     format_diy_response,
@@ -79,7 +80,14 @@ async def execute_agent_streaming(bedrock_model, prompt, pending_confirmation=No
     # Fallback to local tools if gateway or oauth is not working
     if not gateway_url or not is_oauth_available():
         logger.info("🏠 No MCP available - using local streaming")
-        local_tools = [get_current_time, echo_message, use_aws, handoff_to_user]
+        local_tools = [
+            get_current_time,
+            echo_message,
+            use_aws,
+            handoff_to_user,
+            retrieve_from_knowledge_base,
+            quick_kb_search
+        ]
         agent = AwsCloudOpsAgent(model=bedrock_model, tools=local_tools)
         logger.info(f"🤖 Using Bedrock Model ID: {agent.model.config}")
         handoff_detected = False
@@ -127,13 +135,20 @@ async def execute_agent_streaming(bedrock_model, prompt, pending_confirmation=No
                 )
                 tools.append(MCPAgentTool(mcp_tool, mcp_client))
 
-            # Add local tools
-            all_tools = [get_current_time, echo_message, use_aws, handoff_to_user]
+            # Add local tools including KB retrieval
+            all_tools = [
+                get_current_time,
+                echo_message,
+                use_aws,
+                handoff_to_user,
+                retrieve_from_knowledge_base,
+                quick_kb_search
+            ]
             if tools:
                 all_tools.extend(tools)
                 logger.info(f"🛠️ Streaming with {len(tools)} searched MCP tools + local tools")
 
-            logger.info(f"🛠️ Total tools available: {len(all_tools)} (searched: {len(tools)}, local: 4)")
+            logger.info(f"🛠️ Total tools available: {len(all_tools)} (searched: {len(tools)}, local: 6)")
 
             agent = AwsCloudOpsAgent(model=bedrock_model, tools=all_tools)
             logger.info(f"🤖 Using Bedrock Model ID: {agent.model.config}")
@@ -150,7 +165,14 @@ async def execute_agent_streaming(bedrock_model, prompt, pending_confirmation=No
         logger.error(f"❌ MCP streaming failed: {e}")
         # Fallback to local streaming
         logger.info("🏠 Falling back to local streaming")
-        local_tools = [get_current_time, echo_message, use_aws, handoff_to_user]
+        local_tools = [
+            get_current_time,
+            echo_message,
+            use_aws,
+            handoff_to_user,
+            retrieve_from_knowledge_base,
+            quick_kb_search
+        ]
         agent = AwsCloudOpsAgent(model=bedrock_model, tools=local_tools)
         logger.info(f"🤖 Using Bedrock Model ID: {agent.model.config}")
         handoff_detected = False
