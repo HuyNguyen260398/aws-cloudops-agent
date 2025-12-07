@@ -1,0 +1,18 @@
+name: CI - Placeholder (No artifacts to build)
+
+on:
+  push:
+    branches: ["feature/pipeline"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: self-hosted
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: CI Placeholder
+      run: |
+        echo "No Lambda artifacts to build - Terraform handles Lambda deployment directly"
+        echo "This workflow exists to trigger CD workflow"
