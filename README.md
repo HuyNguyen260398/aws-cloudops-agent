@@ -12,7 +12,7 @@ A beginner-friendly AWS operations agent built with AWS Strands Agent SDK and  A
 
 ## 🏛️ Initial Architecture
 
-![AWS CloudOps Agent Architecture](docs/aws-strands-agent.drawio.svg)
+![AWS CloudOps Agent Architecture](docs/aws_agent.drawio.svg)
 
 ## 🛠️ Setup
 
