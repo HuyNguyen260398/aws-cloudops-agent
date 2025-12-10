@@ -87,7 +87,7 @@ memory:
 
 # Knowledge Base Settings (used by deployment scripts and KB retrieval tools)
 knowledge_base:
-  id: "ZNCURRPGDG"  # Auto-updated by Terraform
+  id: "QXXYPY7SKY"  # Auto-updated by Terraform
   region: "ap-southeast-2"
 
 # Deployment Settings (used by deployment scripts) 

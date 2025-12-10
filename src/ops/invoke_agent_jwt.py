@@ -127,7 +127,7 @@ while True:
     try:
         # Invoke the agent with JWT token (streaming response)
         response = requests.post(
-            url, headers=headers, data=json.dumps(payload), stream=True
+            url, headers=headers, data=json.dumps(payload), stream=True, verify=False
         )
 
         print("\r🤖 Agent: ", end="", flush=True)
