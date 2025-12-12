@@ -22,7 +22,7 @@ logger = mylogger.get_logger()
 def retrieve_from_knowledge_base(
     query: str,
     max_results: int = 3,
-    min_score: float = 0.6
+    min_score: float = 0.4
 ) -> str:
     """
     Retrieve relevant documents from Bedrock Knowledge Base
