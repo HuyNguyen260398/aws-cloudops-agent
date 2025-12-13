@@ -5,18 +5,18 @@ import time
 from datetime import datetime
 from typing import AsyncGenerator, Optional
 from dotenv import load_dotenv
+from threading import Lock
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-# Add project root to path
-project_root = os.path.dirname(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-)
-sys.path.append(project_root)
+# Add src directory to path for imports
+src_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, src_dir)
 
-load_dotenv(os.path.join("config", ".env"))
+# To bypass the Mutative operations confirmation prompts from use_aws tool
+os.environ.setdefault("BYPASS_TOOL_CONSENT", "true")
 
 # AWS documented imports
 from mcp.client.streamable_http import streamablehttp_client
@@ -55,6 +55,59 @@ import utils.mylogger as mylogger
 
 logger = mylogger.get_logger()
 
+# ============================================================================
+# PENDING CONFIRMATION STORAGE
+# ============================================================================
+
+# Store pending confirmations: {session_id: {"prompt": str, "response_so_far": str, "timestamp": datetime}}
+_pending_confirmations = {}
+_confirmation_lock = Lock()
+
+
+def save_pending_confirmation(
+    session_id: str, original_prompt: str, response_so_far: str
+):
+    """Save pending confirmation state"""
+    with _confirmation_lock:
+        _pending_confirmations[session_id] = {
+            "prompt": original_prompt,
+            "response_so_far": response_so_far,
+            "timestamp": datetime.now(),
+        }
+        logger.info(f"💾 Saved pending confirmation for session {session_id}")
+
+
+def get_pending_confirmation(session_id: str) -> dict:
+    """Get pending confirmation state"""
+    with _confirmation_lock:
+        return _pending_confirmations.get(session_id)
+
+
+def clear_pending_confirmation(session_id: str):
+    """Clear pending confirmation state"""
+    with _confirmation_lock:
+        if session_id in _pending_confirmations:
+            del _pending_confirmations[session_id]
+            logger.info(f"🗑️ Cleared pending confirmation for session {session_id}")
+
+
+def is_confirmation_response(message: str) -> tuple[bool, bool]:
+    """Check if message is a confirmation response. Returns (is_confirmation, is_approved)"""
+    message_lower = message.strip().lower()
+    if message_lower in [
+        "yes",
+        "y",
+        "approve",
+        "confirmed",
+        "proceed",
+        "ok",
+        "confirm",
+    ]:
+        return True, True
+    elif message_lower in ["no", "n", "deny", "cancel", "stop", "abort"]:
+        return True, False
+    return False, False
+
 
 # ============================================================================
 # EXACT AWS DOCUMENTATION PATTERNS
@@ -86,7 +139,7 @@ async def execute_agent_streaming(bedrock_model, prompt, pending_confirmation=No
             use_aws,
             handoff_to_user,
             retrieve_from_knowledge_base,
-            quick_kb_search
+            quick_kb_search,
         ]
         agent = AwsCloudOpsAgent(model=bedrock_model, tools=local_tools)
         logger.info(f"🤖 Using Bedrock Model ID: {agent.model.config}")
@@ -120,12 +173,13 @@ async def execute_agent_streaming(bedrock_model, prompt, pending_confirmation=No
             # Use semantic search to get relevant tools
             search_query = extract_tool_query(prompt)
             logger.info(f"🔍 Tool search query: {search_query}")
-            
+
             searched_tools = tool_search(gateway_url, access_token, search_query)
             logger.info(f"🎯 Found {len(searched_tools)} relevant tools")
-            
+
             # Convert to MCPAgentTool format
             from mcp.types import Tool as MCPTool
+
             tools = []
             for tool in searched_tools[:10]:  # Limit to top 10
                 mcp_tool = MCPTool(
@@ -142,13 +196,17 @@ async def execute_agent_streaming(bedrock_model, prompt, pending_confirmation=No
                 use_aws,
                 handoff_to_user,
                 retrieve_from_knowledge_base,
-                quick_kb_search
+                quick_kb_search,
             ]
             if tools:
                 all_tools.extend(tools)
-                logger.info(f"🛠️ Streaming with {len(tools)} searched MCP tools + local tools")
+                logger.info(
+                    f"🛠️ Streaming with {len(tools)} searched MCP tools + local tools"
+                )
 
-            logger.info(f"🛠️ Total tools available: {len(all_tools)} (searched: {len(tools)}, local: 6)")
+            logger.info(
+                f"🛠️ Total tools available: {len(all_tools)} (searched: {len(tools)}, local: 6)"
+            )
 
             agent = AwsCloudOpsAgent(model=bedrock_model, tools=all_tools)
             logger.info(f"🤖 Using Bedrock Model ID: {agent.model.config}")
@@ -171,7 +229,7 @@ async def execute_agent_streaming(bedrock_model, prompt, pending_confirmation=No
             use_aws,
             handoff_to_user,
             retrieve_from_knowledge_base,
-            quick_kb_search
+            quick_kb_search,
         ]
         agent = AwsCloudOpsAgent(model=bedrock_model, tools=local_tools)
         logger.info(f"🤖 Using Bedrock Model ID: {agent.model.config}")
@@ -193,7 +251,7 @@ def _is_handoff_event(event) -> bool:
     """Check if event contains handoff_to_user tool usage or confirmation prompt"""
     if not isinstance(event, dict):
         return False
-    
+
     # Check for tool use in event structure
     if "event" in event:
         inner = event["event"]
@@ -201,15 +259,18 @@ def _is_handoff_event(event) -> bool:
             start = inner["contentBlockStart"].get("start", {})
             if "toolUse" in start:
                 return start["toolUse"].get("name") == "handoff_to_user"
-        
+
         # Check for confirmation prompt in text content
         if "contentBlockDelta" in inner:
             delta = inner["contentBlockDelta"].get("delta", {})
             if "text" in delta:
                 text = delta["text"]
-                if "Do you want to proceed? [y/*]" in text or "is potentially mutative" in text:
+                if (
+                    "Do you want to proceed? [y/*]" in text
+                    or "is potentially mutative" in text
+                ):
                     return True
-    
+
     return False
 
 
@@ -256,19 +317,50 @@ async def stream_response(
     try:
         logger.info(f"🔄 Processing: {user_message[:50]}...")
 
-        # Get conversation context if available
-        context = ""
-        if is_memory_available() and session_id:
-            context = get_conversation_context(session_id, actor_id)
+        # Check if this is a confirmation response to a pending action
+        is_confirmation, is_approved = is_confirmation_response(user_message)
+        pending = get_pending_confirmation(session_id) if session_id else None
 
-        # Prepare message with context
-        final_message = user_message
-        if context:
-            final_message = f"{context}\n\nCurrent user message: {user_message}"
+        if is_confirmation and pending:
+            logger.info(f"✅ Detected confirmation response: approved={is_approved}")
+
+            if is_approved:
+                # User approved - reconstruct the context and continue with the original action
+                original_prompt = pending["prompt"]
+                previous_response = pending["response_so_far"]
+
+                # Build confirmation message that includes full context
+                final_message = f"""Previous interaction:
+User: {original_prompt}
+Assistant: {previous_response}
+
+User has now confirmed with: {user_message}
+
+Please proceed with the action that was awaiting confirmation. The user has approved, so you should now execute the changes."""
+
+                logger.info("🚀 Proceeding with confirmed action")
+                clear_pending_confirmation(session_id)
+            else:
+                # User denied - inform and stop
+                yield 'data: {"type": "text", "text": "Action cancelled. I will not proceed with the changes.\\n"}\n\n'
+                clear_pending_confirmation(session_id)
+                return
+        else:
+            # Normal message flow - get conversation context if available
+            context = ""
+            if is_memory_available() and session_id:
+                context = get_conversation_context(session_id, actor_id)
+
+            # Prepare message with context
+            final_message = user_message
+            if context:
+                final_message = f"{context}\n\nCurrent user message: {user_message}"
 
         # Create model with longer timeout for streaming
         model = BedrockModel(**model_settings, streaming=True)
-        logger.info(f"🤖 Using Bedrock Model - ID: {model_settings['model_id']}, Region: {model_settings['region_name']}")
+        logger.info(
+            f"🤖 Using Bedrock Model - ID: {model_settings['model_id']}, Region: {model_settings['region_name']}"
+        )
 
         # Use AWS documented streaming pattern
         last_event_time = time.time()
@@ -278,14 +370,20 @@ async def stream_response(
             # Check for handoff requirement
             if isinstance(event, dict) and event.get("handoff_required"):
                 logger.info("🤚 Handoff to user required - pausing execution")
-                yield "data: {\"type\": \"handoff_required\", \"message\": \"Agent requires your confirmation to proceed. Please respond with 'yes' or 'no'.\"}\n\n"
+
+                # Save pending confirmation state with original user message and response so far
+                if session_id:
+                    response_so_far = "".join(response_parts)
+                    save_pending_confirmation(session_id, user_message, response_so_far)
+
+                yield 'data: {"type": "handoff_required", "message": "Agent requires your confirmation to proceed. Please respond with \'yes\' or \'no\'."}\n\n'
                 handoff_detected = True
                 continue
-            
+
             # Skip remaining events after handoff
             if handoff_detected:
                 continue
-            
+
             # Format and yield response
             formatted = format_diy_response(event)
             yield formatted

@@ -18,7 +18,7 @@ deploy to AgentCore using docker
 	docker buildx build --platform linux/arm64 -t my-agent:arm64 --load .
 	
 	# Local test with token
-	docker run --platform linux/arm64 -p 8080:8080 -e AWS_ACCESS_KEY_ID="" -e AWS_SECRET_ACCESS_KEY="" -e AWS_SESSION_TOKEN="" -e AWS_REGION="ap-southeast-1" my-agent:arm64
+	docker run --platform linux/arm64 -p 8080:8080 -e AWS_ACCESS_KEY_ID="" -e AWS_SECRET_ACCESS_KEY="" -e AWS_SESSION_TOKEN="" -e AWS_REGION="ap-southeast-1" -e COGNITO_USERNAME="" -e COGNITO_PASSWORD="" -e BYPASS_TOOL_CONSENT="" my-agent:arm64
 	
 	# Create ECR repository
 	aws ecr create-repository --repository-name aws-cloudops-agent --region ap-southeast-1
