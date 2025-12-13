@@ -8,16 +8,24 @@ import boto3
 import json
 import os
 import uuid
-import requests
 import urllib.parse
 from datetime import datetime
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 
+AWS_REGION = "ap-southeast-1"
 
-def get_cognito_jwt_token(username, password, client_id, region):
+execute_url = os.environ.get("EXECUTE_URL")
+
+
+def get_cognito_jwt_token(username, password, client_id, user_pool_id):
     """Get JWT access token from AWS Cognito"""
-    cognito_client = boto3.client("cognito-idp", region_name=region)
+    # Extract region from User Pool ID (format: region_poolId)
+    # Example: ap-southeast-1_jjG5DkVCy -> ap-southeast-1
+    cognito_region = user_pool_id.split("_")[0] if user_pool_id else "ap-southeast-1"
+
+    print(f"Using Cognito region: {cognito_region} (from pool: {user_pool_id})")
+    cognito_client = boto3.client("cognito-idp", region_name=cognito_region)
 
     try:
         response = cognito_client.initiate_auth(
@@ -31,26 +39,24 @@ def get_cognito_jwt_token(username, password, client_id, region):
         return None
 
 
-def construct_analysis_prompt(service_name, timestamp, error_details, context=None):
+def construct_analysis_prompt(event):
     """
     Create comprehensive analysis prompt with structured output requirements
     Supports any AWS service with dynamic context
     """
-    # Build infrastructure context from provided details
-    infrastructure_context = ""
-    if context:
-        if isinstance(context, dict):
-            if context.get("aws_services"):
-                infrastructure_context = "\n\n**Infrastructure Context:**\n"
-                for idx, service in enumerate(context["aws_services"], 1):
-                    infrastructure_context += f"{idx}. {service}\n"
+    # Extract information from event
+    service_name = event.get("service_name")
+    timestamp = datetime.now().isoformat()
+    error_details = event.get("error_details", "Unknown error")
 
-            if context.get("additional_info"):
-                infrastructure_context += (
-                    f"\n**Additional Information:**\n{context['additional_info']}\n"
-                )
-        elif isinstance(context, str):
-            infrastructure_context = f"\n\n**Infrastructure Context:**\n{context}\n"
+    # Build infrastructure context from full event
+    infrastructure_context = "\n\n**Full Service Context (JSON):**\n"
+    infrastructure_context += "```json\n"
+    infrastructure_context += json.dumps(event, indent=2, default=str)
+    infrastructure_context += "\n```\n"
+    print(
+        f"✅ Added full event context to prompt ({len(infrastructure_context)} chars)"
+    )
 
     prompt = f"""URGENT: AWS Service monitoring alert requires immediate analysis.
 
@@ -102,17 +108,24 @@ def construct_analysis_prompt(service_name, timestamp, error_details, context=No
     return prompt
 
 
-def invoke_agent_for_analysis(
-    service_name, timestamp, error_details, context=None, session_id=None
-):
+def invoke_agent_for_analysis(event, session_id=None):
     """Invoke AWS CloudOps Agent to analyze any AWS service issue"""
+    # Extract information from event
+    service_name = event.get("service_name")
+    timestamp = datetime.now().isoformat()
+    error_details = event.get("error_details", "Unknown error")
+    context = event.get("context", None)
+
     runtime_arn = os.environ.get("AGENT_RUNTIME_ARN")
     region = os.environ.get(
-        "AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "ap-southeast-1")
+        "AWS_REGION", os.environ.get("DEFAULT_REGION", "ap-southeast-1")
     )
     cognito_username = os.environ.get("COGNITO_USERNAME")
     cognito_password = os.environ.get("COGNITO_PASSWORD")
     cognito_client_id = os.environ.get("COGNITO_CLIENT_ID")
+    cognito_user_pool_id = os.environ.get(
+        "COGNITO_USER_POOL_ID", "ap-southeast-1_jjG5DkVCy"
+    )
 
     if not all([runtime_arn, cognito_username, cognito_password, cognito_client_id]):
         print("Warning: Agent configuration incomplete. Skipping agent analysis.")
@@ -121,9 +134,9 @@ def invoke_agent_for_analysis(
     print(f"Invoking AWS CloudOps Agent for {service_name} analysis...")
 
     try:
-        # Get JWT token
+        # Get JWT token (region is extracted from user pool ID)
         jwt_token = get_cognito_jwt_token(
-            cognito_username, cognito_password, cognito_client_id, region
+            cognito_username, cognito_password, cognito_client_id, cognito_user_pool_id
         )
 
         if not jwt_token:
@@ -132,16 +145,14 @@ def invoke_agent_for_analysis(
 
         # Prepare agent invocation
         escaped_agent_arn = urllib.parse.quote(runtime_arn, safe="")
-        url = f"https://bedrock-agentcore.{region}.amazonaws.com/runtimes/{escaped_agent_arn}/invocations?qualifier=DEFAULT"
+        url = f"https://bedrock-agentcore.{AWS_REGION}.amazonaws.com/runtimes/{escaped_agent_arn}/invocations?qualifier=DEFAULT"
 
         # Create or use provided session ID
         if not session_id:
             session_id = str(uuid.uuid4())
 
-        # Construct enhanced analysis prompt with context
-        prompt = construct_analysis_prompt(
-            service_name, timestamp, error_details, context
-        )
+        # Construct enhanced analysis prompt with full event context
+        prompt = construct_analysis_prompt(event)
 
         headers = {
             "Authorization": f"Bearer {jwt_token}",
@@ -156,14 +167,14 @@ def invoke_agent_for_analysis(
         }
 
         # Invoke agent with streaming
-        response = requests.post(
-            url, headers=headers, data=json.dumps(payload), stream=True, timeout=90
-        )
+        req = Request(url, data=json.dumps(payload).encode("utf-8"), headers=headers)
 
-        if response.status_code == 200:
+        response = urlopen(req, timeout=90)
+
+        if response.status in [200, 202]:
             agent_response = ""
             # Collect streaming response
-            for line in response.iter_lines():
+            for line in response:
                 if line:
                     decoded_line = line.decode("utf-8")
                     if decoded_line.startswith("data: "):
@@ -193,11 +204,17 @@ def invoke_agent_for_analysis(
             print(f"Agent analysis completed ({len(formatted_response)} chars)")
             return formatted_response, session_id
         else:
-            print(f"Agent invocation failed: {response.status_code}")
+            print(f"Agent invocation failed: {response.status}")
             return None, None
 
-    except requests.exceptions.Timeout:
+    except TimeoutError:
         print("Agent request timed out")
+        return None, None
+    except URLError as e:
+        if isinstance(e.reason, TimeoutError):
+            print("Agent request timed out")
+        else:
+            print(f"Error invoking agent: {e}")
         return None, None
     except Exception as e:
         print(f"Error invoking agent: {e}")
@@ -284,7 +301,7 @@ def summarize_agent_analysis(agent_analysis):
 def upload_analysis_to_s3(
     alert_id, service_name, timestamp, agent_analysis, service_type="general"
 ):
-    """Upload full analysis to S3 bucket and return the URL"""
+    """Upload full analysis to S3 bucket and return a pre-signed URL"""
     s3_bucket = os.environ.get("S3_ANALYSIS_BUCKET")
 
     if not s3_bucket:
@@ -293,7 +310,7 @@ def upload_analysis_to_s3(
 
     try:
         s3_client = boto3.client("s3")
-        region = os.environ.get("AWS_REGION", "ap-southeast-1")
+        region = os.environ.get("DEFAULT_REGION", "ap-southeast-1")
 
         # Create filename with timestamp and service type
         date_str = datetime.now().strftime("%Y-%m-%d")
@@ -307,10 +324,10 @@ def upload_analysis_to_s3(
         # Format analysis as markdown
         markdown_content = f"""# AWS Service Analysis Report
 
-**Alert ID:** {alert_id}  
-**Service/Resource:** {service_name}  
-**Service Type:** {service_type}  
-**Timestamp:** {timestamp}  
+**Alert ID:** {alert_id}
+**Service/Resource:** {service_name}
+**Service Type:** {service_type}
+**Timestamp:** {timestamp}
 **Status:** ISSUE DETECTED
 
 ---
@@ -319,7 +336,7 @@ def upload_analysis_to_s3(
 
 ---
 
-*Generated by AWS CloudOps Agent*  
+*Generated by AWS CloudOps Agent*
 *Report ID: {alert_id}*
 """
 
@@ -337,11 +354,15 @@ def upload_analysis_to_s3(
             },
         )
 
-        # Generate URL
-        s3_url = f"https://{s3_bucket}.s3.{region}.amazonaws.com/{filename}"
-        print(f"Analysis uploaded to S3: {s3_url}")
+        # Generate pre-signed URL (valid for 7 days)
+        presigned_url = s3_client.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": s3_bucket, "Key": filename},
+            ExpiresIn=604800,  # 7 days in seconds
+        )
+        print(f"Analysis uploaded to S3 with pre-signed URL (expires in 7 days)")
 
-        return s3_url, filename
+        return presigned_url, filename
 
     except Exception as e:
         print(f"Failed to upload analysis to S3: {e}")
@@ -405,48 +426,6 @@ def store_alert_in_dynamodb(
         return False
 
 
-def send_sns_notification(
-    service_name,
-    timestamp,
-    alert_id,
-    agent_analysis,
-    s3_url,
-    service_type="AWS Service",
-):
-    """Send email notification via SNS"""
-    sns_topic_arn = os.environ.get("SNS_TOPIC_ARN")
-
-    if not sns_topic_arn:
-        print("SNS_TOPIC_ARN not configured")
-        return False
-
-    try:
-        sns = boto3.client("sns")
-        summary = summarize_agent_analysis(agent_analysis)
-
-        email_message = f"""ALERT: {service_type} issue detected - {service_name}
-Timestamp: {timestamp}
-
-AI Agent Analysis Summary:
-{summary}
-
-Full Analysis: {s3_url}
-
-Alert ID: {alert_id}
-"""
-
-        sns.publish(
-            TopicArn=sns_topic_arn,
-            Subject=f"{service_type} Alert: {service_name}",
-            Message=email_message,
-        )
-        print("Email notification sent via SNS")
-        return True
-    except Exception as e:
-        print(f"Failed to send SNS notification: {e}")
-        return False
-
-
 def send_teams_notification(
     service_name,
     timestamp,
@@ -457,10 +436,10 @@ def send_teams_notification(
     status="ISSUE DETECTED",
 ):
     """Send notification to Microsoft Teams with Adaptive Card"""
-    webhook_url = os.environ.get("TEAMS_WEBHOOK_URL")
+    webhook_url = os.environ.get("TEAMS_WORKFLOW_URL")
 
     if not webhook_url:
-        print("TEAMS_WEBHOOK_URL environment variable not set")
+        print("TEAMS_WORKFLOW_URL environment variable not set")
         return False
 
     summary_text = summarize_agent_analysis(agent_analysis)
@@ -564,88 +543,6 @@ def send_teams_notification(
         return False
 
 
-def send_slack_notification(
-    service_name,
-    timestamp,
-    agent_analysis,
-    alert_id,
-    s3_url,
-    service_type="AWS Service",
-    status="ISSUE DETECTED",
-):
-    """Send notification to Slack via webhook"""
-    webhook_url = os.environ.get("SLACK_WEBHOOK_URL")
-
-    if not webhook_url:
-        print("SLACK_WEBHOOK_URL environment variable not set")
-        return False
-
-    summary_text = summarize_agent_analysis(agent_analysis)
-
-    blocks = [
-        {
-            "type": "header",
-            "text": {
-                "type": "plain_text",
-                "text": f"ALERT: {service_type} - {service_name}",
-                "emoji": True,
-            },
-        },
-        {
-            "type": "section",
-            "fields": [
-                {"type": "mrkdwn", "text": f"*Service/Resource:*\n{service_name}"},
-                {"type": "mrkdwn", "text": f"*Type:*\n{service_type}"},
-                {"type": "mrkdwn", "text": f"*Status:*\n{status}"},
-                {"type": "mrkdwn", "text": f"*Timestamp:*\n{timestamp}"},
-                {"type": "mrkdwn", "text": f"*Alert ID:*\n`{alert_id}`"},
-            ],
-        },
-        {"type": "divider"},
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": f"*🤖 AI Agent Analysis Summary:*\n{summary_text[:2800]}",
-            },
-        },
-    ]
-
-    if s3_url:
-        blocks.append(
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": f"<{s3_url}|📄 View Full Analysis>",
-                },
-            }
-        )
-
-    message = {
-        "blocks": blocks,
-        "attachments": [
-            {
-                "color": "#FF0000",
-                "fallback": f"{service_type} {service_name} - {status}",
-            }
-        ],
-    }
-
-    try:
-        req = Request(
-            webhook_url,
-            data=json.dumps(message).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
-        )
-        response = urlopen(req)
-        print(f"Slack notification sent: {response.read().decode()}")
-        return True
-    except Exception as e:
-        print(f"Failed to send Slack notification: {e}")
-        return False
-
-
 def lambda_handler(event, context):
     """
     Main Lambda handler for general AWS service analysis
@@ -690,20 +587,35 @@ def lambda_handler(event, context):
     print(f"Issue: {error_details}")
     print(f"Severity: {severity}")
 
+    # Log context received
+    if service_context:
+        if isinstance(service_context, dict):
+            print(f"📦 Context received:")
+            print(
+                f"   - AWS Services: {len(service_context.get('aws_services', []))} items"
+            )
+            print(
+                f"   - Additional Info: {len(service_context.get('additional_info', ''))} chars"
+            )
+        else:
+            print(f"📦 Context received (string): {len(service_context)} chars")
+    else:
+        print(f"⚠️ No context received")
+
     try:
         # Generate unique alert ID
         alert_id = str(uuid.uuid4())
 
-        # Invoke AI agent for analysis with context
+        # Invoke AI agent for analysis with full event context
         print("Invoking agent for comprehensive analysis...")
-        agent_analysis, agent_session_id = invoke_agent_for_analysis(
-            service_name, timestamp, error_details, service_context
-        )
+        agent_analysis, agent_session_id = invoke_agent_for_analysis(event)
 
         if not agent_analysis:
             print("Agent analysis failed, sending basic alert")
             agent_analysis = f"Agent analysis unavailable. Error: {error_details}"
             agent_session_id = None
+        else:
+            print(f"✅ Agent analysis completed - Session ID: {agent_session_id}")
 
         # Upload full analysis to S3
         s3_url, s3_key = upload_analysis_to_s3(
@@ -711,49 +623,33 @@ def lambda_handler(event, context):
         )
 
         # Store alert metadata in DynamoDB
-        store_alert_in_dynamodb(
-            alert_id,
-            service_name,
-            timestamp,
-            error_details,
-            agent_analysis,
-            agent_session_id,
-            s3_url,
-            s3_key,
-            service_type,
-            issue_type,
-            severity,
-            additional_metadata,
-        )
+        # store_alert_in_dynamodb(
+        #     alert_id,
+        #     service_name,
+        #     timestamp,
+        #     error_details,
+        #     agent_analysis,
+        #     agent_session_id,
+        #     s3_url,
+        #     s3_key,
+        #     service_type,
+        #     issue_type,
+        #     severity,
+        #     additional_metadata,
+        # )
 
         # Send notifications to all channels
         print("Sending notifications...")
 
-        # Email via SNS
-        send_sns_notification(
-            service_name, timestamp, alert_id, agent_analysis, s3_url, service_type
-        )
-
-        # Teams with Adaptive Card
+        # Teams via Power Automate Workflow
         send_teams_notification(
             service_name,
             timestamp,
             agent_analysis,
             alert_id,
             s3_url,
-            service_type,
-            status,
-        )
-
-        # Slack (if configured)
-        send_slack_notification(
-            service_name,
-            timestamp,
-            agent_analysis,
-            alert_id,
-            s3_url,
-            service_type,
-            status,
+            service_type=service_type,
+            status=status,
         )
 
         return {

@@ -13,9 +13,11 @@ from unittest.mock import patch
 src_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(src_root)
 
+
+
 # Set environment variables for testing
 os.environ["SNS_TOPIC_ARN"] = "arn:aws:sns:ap-southeast-1:010382427026:domain-alerts"
-os.environ["TEAMS_WEBHOOK_URL"] = (
+os.environ["TEAMS_WORKFLOW_URL"] = (
     "https://bosch.webhook.office.com/webhookb2/88068855-0aad-4ebc-bd2b-a96866c0fe4d@0ae51e19-07c8-4e4b-bb6d-648ee58410f4/IncomingWebhook/bad03592b02c40e7a5eae7b607a181cb/c92e3493-8f7d-44a8-9f87-35b1ecd5178e/V2iasvdXoAsv_QViNlkv2tfJX44vrAA9Eih-oGIqZwES81"  # Add your Teams webhook URL here for testing
 )
 os.environ["SLACK_WEBHOOK_URL"] = ""
@@ -219,7 +221,7 @@ def test_lambda(use_sample_response=False, service_type="route53"):
     print(f"  S3 Bucket: {os.environ.get('S3_ANALYSIS_BUCKET')}")
     print(f"  DynamoDB Table: {os.environ.get('DYNAMODB_ALERTS_TABLE')}")
     print(
-        f"  Teams Webhook: {'Configured' if os.environ.get('TEAMS_WEBHOOK_URL') else 'Not configured'}"
+        f"  Teams Webhook: {'Configured' if os.environ.get('TEAMS_WORKFLOW_URL') else 'Not configured'}"
     )
     print(
         f"  Slack Webhook: {'Configured' if os.environ.get('SLACK_WEBHOOK_URL') else 'Not configured'}"
@@ -350,7 +352,7 @@ if __name__ == "__main__":
 
     # Override environment variables from command line
     if args.teams_webhook:
-        os.environ["TEAMS_WEBHOOK_URL"] = args.teams_webhook
+        os.environ["TEAMS_WORKFLOW_URL"] = args.teams_webhook
 
     if args.slack_webhook:
         os.environ["SLACK_WEBHOOK_URL"] = args.slack_webhook

@@ -1,100 +1,162 @@
 {
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Sid": "ECRImageAccess",
-            "Effect": "Allow",
-            "Action": [
-                "ecr:BatchGetImage",
-                "ecr:GetDownloadUrlForLayer"
-            ],
-            "Resource": [
-                "arn:aws:ecr:ap-southeast-2:010382427026:repository/*"
-            ]
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "logs:DescribeLogStreams",
-                "logs:CreateLogGroup"
-            ],
-            "Resource": [
-                "arn:aws:logs:ap-southeast-2:010382427026:log-group:/aws/bedrock-agentcore/runtimes/*"
-            ]
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "logs:DescribeLogGroups"
-            ],
-            "Resource": [
-                "arn:aws:logs:ap-southeast-2:010382427026:log-group:*"
-            ]
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "logs:CreateLogStream",
-                "logs:PutLogEvents"
-            ],
-            "Resource": [
-                "arn:aws:logs:ap-southeast-2:010382427026:log-group:/aws/bedrock-agentcore/runtimes/*:log-stream:*"
-            ]
-        },
-        {
-            "Sid": "ECRTokenAccess",
-            "Effect": "Allow",
-            "Action": [
-                "ecr:GetAuthorizationToken"
-            ],
-            "Resource": "*"
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "xray:PutTraceSegments",
-                "xray:PutTelemetryRecords",
-                "xray:GetSamplingRules",
-                "xray:GetSamplingTargets"
-            ],
-            "Resource": [
-                "*"
-            ]
-        },
-        {
-            "Effect": "Allow",
-            "Resource": "*",
-            "Action": "cloudwatch:PutMetricData",
-            "Condition": {
-                "StringEquals": {
-                    "cloudwatch:namespace": "bedrock-agentcore"
-                }
-            }
-        },
-        {
-            "Sid": "GetAgentAccessToken",
-            "Effect": "Allow",
-            "Action": [
-                "bedrock-agentcore:GetWorkloadAccessToken",
-                "bedrock-agentcore:GetWorkloadAccessTokenForJWT",
-                "bedrock-agentcore:GetWorkloadAccessTokenForUserId"
-            ],
-            "Resource": [
-                "arn:aws:bedrock-agentcore:ap-southeast-2:010382427026:workload-identity-directory/default",
-                "arn:aws:bedrock-agentcore:ap-southeast-2:010382427026:workload-identity-directory/default/workload-identity/aws-cloudops-agent"
-            ]
-        },
-        {
-            "Sid": "BedrockModelInvocation",
-            "Effect": "Allow",
-            "Action": [
-                "bedrock:InvokeModel",
-                "bedrock:InvokeModelWithResponseStream"
-            ],
-            "Resource": [
-                "arn:aws:bedrock:*::foundation-model/*",
-                "arn:aws:bedrock:ap-southeast-2:010382427026:*"
-            ]
-        }
-    ]
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "LambdaFullPermissions",
+      "Effect": "Allow",
+      "Action": ["lambda:*"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "IAMReadOnlyPermissions",
+      "Effect": "Allow",
+      "Action": ["iam:Get*", "iam:List*"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "EC2FullPermissions",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:Describe*",
+        "ec2:StartInstances",
+        "ec2:StopInstances",
+        "ec2:RebootInstances",
+        "ec2:TerminateInstances",
+        "ec2:CreateTags"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CloudWatchFullPermissions",
+      "Effect": "Allow",
+      "Action": ["logs:*", "cloudwatch:*"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CloudFrontFullPermissions",
+      "Effect": "Allow",
+      "Action": ["cloudfront:*"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "Route53FullPermissions",
+      "Effect": "Allow",
+      "Action": ["route53:*", "route53domains:*"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "S3FullPermissions",
+      "Effect": "Allow",
+      "Action": ["s3:*"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ACMFullPermissions",
+      "Effect": "Allow",
+      "Action": ["acm:*"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CloudTrailFullPermissions",
+      "Effect": "Allow",
+      "Action": [
+        "cloudtrail:LookupEvents",
+        "cloudtrail:GetTrailStatus",
+        "cloudtrail:DescribeTrails",
+        "cloudtrail:ListTrails",
+        "cloudtrail:GetEventSelectors"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "RDSFullPermissions",
+      "Effect": "Allow",
+      "Action": [
+        "rds:Describe*",
+        "rds:List*",
+        "rds:StartDBInstance",
+        "rds:StopDBInstance",
+        "rds:RebootDBInstance"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DynamoDBFullPermissions",
+      "Effect": "Allow",
+      "Action": ["dynamodb:*"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "SNSFullPermissions",
+      "Effect": "Allow",
+      "Action": ["sns:*"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "SQSFullPermissions",
+      "Effect": "Allow",
+      "Action": ["sqs:*"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ELBFullPermissions",
+      "Effect": "Allow",
+      "Action": [
+        "elasticloadbalancing:Describe*",
+        "elasticloadbalancing:RegisterTargets",
+        "elasticloadbalancing:DeregisterTargets"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "AutoScalingPermissions",
+      "Effect": "Allow",
+      "Action": [
+        "autoscaling:Describe*",
+        "autoscaling:SetDesiredCapacity",
+        "autoscaling:UpdateAutoScalingGroup"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ECSPermissions",
+      "Effect": "Allow",
+      "Action": ["ecs:Describe*", "ecs:List*", "ecs:UpdateService"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "EKSPermissions",
+      "Effect": "Allow",
+      "Action": ["eks:Describe*", "eks:List*"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "BedrockFullPermissions",
+      "Effect": "Allow",
+      "Action": ["bedrock:*"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "STSPermissions",
+      "Effect": "Allow",
+      "Action": ["sts:GetCallerIdentity", "sts:AssumeRole"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "HealthPermissions",
+      "Effect": "Allow",
+      "Action": [
+        "health:DescribeEvents",
+        "health:DescribeEventDetails",
+        "health:DescribeAffectedEntities"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "SupportPermissions",
+      "Effect": "Allow",
+      "Action": ["support:*"],
+      "Resource": "*"
+    }
+  ]
 }

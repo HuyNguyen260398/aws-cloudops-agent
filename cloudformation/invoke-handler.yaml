@@ -1,0 +1,316 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Lambda function to receive service issues and invoke AI agent for analysis'
+
+Parameters:
+  AgentRuntimeArn:
+    Type: String
+    Description: 'AWS Bedrock Agent Runtime ARN for analysis'
+    Default: 'arn:aws:bedrock-agentcore:ap-southeast-1:010382427026:runtime/aws_cloudops_agent-t6rEDA5h0K'
+  
+  CognitoUsername:
+    Type: String
+    Description: 'Cognito username for agent authentication'
+    Default: 'ted8hc'
+    NoEcho: true
+  
+  CognitoPassword:
+    Type: String
+    Description: 'Cognito password for agent authentication'
+    Default: 'eds@Bgsv2025'
+    NoEcho: true
+  
+  CognitoClientId:
+    Type: String
+    Description: 'Cognito client ID for agent authentication'
+    Default: '40ede8sr0l0bs37hps0lbgvr8p'
+  
+  CognitoUserPoolId:
+    Type: String
+    Description: 'Cognito User Pool ID'
+    Default: 'ap-southeast-1_jjG5DkVCy'
+  
+  TeamsWorkflowUrl:
+    Type: String
+    Description: 'Microsoft Teams Power Automate workflow URL for notifications'
+    Default: 'https://bosch.webhook.office.com/webhookb2/88068855-0aad-4ebc-bd2b-a96866c0fe4d@0ae51e19-07c8-4e4b-bb6d-648ee58410f4/IncomingWebhook/bad03592b02c40e7a5eae7b607a181cb/c92e3493-8f7d-44a8-9f87-35b1ecd5178e/V2iasvdXoAsv_QViNlkv2tfJX44vrAA9Eih-oGIqZwES81'
+    NoEcho: true
+  
+  ExecuteUrl:
+    Type: String
+    Description: 'URL for execution Lambda (optional)'
+    Default: ''
+  
+  CreateS3Bucket:
+    Type: String
+    Description: 'Create new S3 bucket for analysis storage'
+    Default: 'true'
+    AllowedValues:
+      - 'true'
+      - 'false'
+  
+  ExistingS3Bucket:
+    Type: String
+    Description: 'Existing S3 bucket name for analysis storage (if CreateS3Bucket is false)'
+    Default: ''
+  
+  CreateDynamoDBTable:
+    Type: String
+    Description: 'Create DynamoDB table for alert tracking'
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+  
+  LambdaDeploymentBucket:
+    Type: String
+    Description: 'S3 bucket containing the Lambda deployment package'
+    Default: ''
+  
+  LambdaDeploymentKey:
+    Type: String
+    Description: 'S3 key for the Lambda deployment package'
+    Default: 'invoke-handler/lambda_invoke_handler.zip'
+
+Conditions:
+  CreateNewS3Bucket: !Equals [!Ref CreateS3Bucket, 'true']
+  UseExistingS3Bucket: !Equals [!Ref CreateS3Bucket, 'false']
+  CreateDynamoTable: !Equals [!Ref CreateDynamoDBTable, 'true']
+  HasExecuteUrl: !Not [!Equals [!Ref ExecuteUrl, '']]
+
+Resources:
+  # S3 Bucket for storing analysis reports
+  AnalysisBucket:
+    Type: AWS::S3::Bucket
+    Condition: CreateNewS3Bucket
+    Properties:
+      BucketName: !Sub 'aws-cloudops-analysis-${AWS::AccountId}'
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldAnalysisReports
+            Status: Enabled
+            ExpirationInDays: 30
+            NoncurrentVersionExpirationInDays: 7
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      Tags:
+        - Key: Service
+          Value: CloudOpsAnalysis
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # DynamoDB Table for alert tracking
+  AlertsTable:
+    Type: AWS::DynamoDB::Table
+    Condition: CreateDynamoTable
+    Properties:
+      TableName: aws-cloudops-alerts
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: alert_id
+          AttributeType: S
+        - AttributeName: timestamp
+          AttributeType: S
+        - AttributeName: service_name
+          AttributeType: S
+      KeySchema:
+        - AttributeName: alert_id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: service-timestamp-index
+          KeySchema:
+            - AttributeName: service_name
+              KeyType: HASH
+            - AttributeName: timestamp
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      Tags:
+        - Key: Service
+          Value: CloudOpsAlerts
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # IAM Role for Lambda
+  InvokeHandlerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: aws-cloudops-invoke-handler-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: CognitoAuthentication
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cognito-idp:InitiateAuth
+                  - cognito-idp:GetUser
+                Resource: !Sub 'arn:aws:cognito-idp:ap-southeast-1:${AWS::AccountId}:userpool/${CognitoUserPoolId}'
+        
+        - PolicyName: BedrockAgentInvoke
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeAgent
+                  - bedrock-agentcore:InvokeRuntime
+                Resource: !Ref AgentRuntimeArn
+        
+        - PolicyName: S3AnalysisStorage
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:PutObjectAcl
+                  - s3:GetObject
+                Resource:
+                  - !If
+                    - CreateNewS3Bucket
+                    - !Sub '${AnalysisBucket.Arn}/*'
+                    - !Sub 'arn:aws:s3:::${ExistingS3Bucket}/*'
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource:
+                  - !If
+                    - CreateNewS3Bucket
+                    - !GetAtt AnalysisBucket.Arn
+                    - !Sub 'arn:aws:s3:::${ExistingS3Bucket}'
+        
+        - PolicyName: DynamoDBAlertStorage
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:GetItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:Query
+                Resource:
+                  - !If
+                    - CreateDynamoTable
+                    - !GetAtt AlertsTable.Arn
+                    - !Sub 'arn:aws:dynamodb:ap-southeast-1:${AWS::AccountId}:table/aws-cloudops-alerts'
+                  - !If
+                    - CreateDynamoTable
+                    - !Sub '${AlertsTable.Arn}/index/*'
+                    - !Sub 'arn:aws:dynamodb:ap-southeast-1:${AWS::AccountId}:table/aws-cloudops-alerts/index/*'
+
+  # Lambda Function
+  InvokeHandlerFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: aws-cloudops-invoke-handler
+      Runtime: python3.11
+      Handler: lambda_invoke_handler.lambda_handler
+      Role: !GetAtt InvokeHandlerRole.Arn
+      Description: 'Receives service issues from monitors and invokes AI agent for analysis'
+      Environment:
+        Variables:
+          AGENT_RUNTIME_ARN: !Ref AgentRuntimeArn
+          COGNITO_USERNAME: !Ref CognitoUsername
+          COGNITO_PASSWORD: !Ref CognitoPassword
+          COGNITO_CLIENT_ID: !Ref CognitoClientId
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPoolId
+          S3_ANALYSIS_BUCKET: !If
+            - CreateNewS3Bucket
+            - !Ref AnalysisBucket
+            - !Ref ExistingS3Bucket
+          DYNAMODB_ALERTS_TABLE: !If
+            - CreateDynamoTable
+            - !Ref AlertsTable
+            - 'aws-cloudops-alerts'
+          TEAMS_WORKFLOW_URL: !Ref TeamsWorkflowUrl
+          EXECUTE_URL: !Ref ExecuteUrl
+          DEFAULT_REGION: 'ap-southeast-1'
+      Code:
+        S3Bucket: !Ref LambdaDeploymentBucket
+        S3Key: !Ref LambdaDeploymentKey
+      Timeout: 120
+      MemorySize: 512
+      Tags:
+        - Key: Service
+          Value: CloudOpsInvokeHandler
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # Lambda Permission for other Lambdas to invoke this
+  InvokeHandlerPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref InvokeHandlerFunction
+      Action: lambda:InvokeFunction
+      Principal: lambda.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
+
+  # CloudWatch Log Group with retention
+  InvokeHandlerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${InvokeHandlerFunction}'
+      RetentionInDays: 7
+
+Outputs:
+  FunctionName:
+    Description: 'Lambda function name'
+    Value: !Ref InvokeHandlerFunction
+    Export:
+      Name: !Sub '${AWS::StackName}-FunctionName'
+  
+  FunctionArn:
+    Description: 'Lambda function ARN'
+    Value: !GetAtt InvokeHandlerFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-FunctionArn'
+  
+  RoleArn:
+    Description: 'IAM role ARN'
+    Value: !GetAtt InvokeHandlerRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-RoleArn'
+  
+  S3BucketName:
+    Description: 'S3 bucket for analysis storage'
+    Value: !If
+      - CreateNewS3Bucket
+      - !Ref AnalysisBucket
+      - !Ref ExistingS3Bucket
+    Export:
+      Name: !Sub '${AWS::StackName}-AnalysisBucket'
+  
+  DynamoDBTableName:
+    Description: 'DynamoDB table for alert tracking'
+    Condition: CreateDynamoTable
+    Value: !Ref AlertsTable
+    Export:
+      Name: !Sub '${AWS::StackName}-AlertsTable'
+  
+  LogGroupName:
+    Description: 'CloudWatch Log Group name'
+    Value: !Ref InvokeHandlerLogGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-LogGroup'

@@ -1,0 +1,136 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Lambda function to monitor domain availability and forward issues to invoke handler for analysis'
+
+Parameters:
+  InvokeLambdaName:
+    Type: String
+    Description: 'Name or ARN of the Lambda invoke handler function'
+    Default: 'aws-cloudops-invoke-handler'
+  
+  DomainToMonitor:
+    Type: String
+    Description: 'Domain to monitor (e.g., nghuy.link)'
+    Default: 'nghuy.link'
+  
+  LambdaDeploymentBucket:
+    Type: String
+    Description: 'S3 bucket containing the Lambda deployment package'
+    Default: ''
+  
+  LambdaDeploymentKey:
+    Type: String
+    Description: 'S3 key for the Lambda deployment package'
+    Default: 'domain-monitor/lambda_domain_monitor.zip'
+  
+  MonitoringSchedule:
+    Type: String
+    Description: 'EventBridge schedule expression for monitoring frequency'
+    Default: 'rate(5 minutes)'
+    AllowedValues:
+      - 'rate(1 minute)'
+      - 'rate(5 minutes)'
+      - 'rate(10 minutes)'
+      - 'rate(15 minutes)'
+      - 'rate(30 minutes)'
+      - 'rate(1 hour)'
+
+Resources:
+  DomainMonitorRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: domain-monitor-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: InvokeLambdaHandler
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource:
+                  - !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${InvokeLambdaName}'
+                  - !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${InvokeLambdaName}:*'
+
+  DomainMonitorFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: domain-monitor
+      Runtime: python3.11
+      Handler: lambda_domain_monitor.lambda_handler
+      Role: !GetAtt DomainMonitorRole.Arn
+      Description: 'Monitors domain availability and forwards issues to invoke handler'
+      Environment:
+        Variables:
+          INVOKE_LAMBDA_NAME: !Ref InvokeLambdaName
+          DOMAIN_TO_MONITOR: !Ref DomainToMonitor
+      Code:
+        S3Bucket: !Ref LambdaDeploymentBucket
+        S3Key: !Ref LambdaDeploymentKey
+      Timeout: 30
+      MemorySize: 128
+      Tags:
+        - Key: Service
+          Value: DomainMonitoring
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  DomainScheduleRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: domain-monitor-schedule
+      Description: 'Trigger domain monitor at specified intervals'
+      ScheduleExpression: !Ref MonitoringSchedule
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt DomainMonitorFunction.Arn
+          Id: DomainMonitorTarget
+
+  DomainMonitorSchedulePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref DomainMonitorFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt DomainScheduleRule.Arn
+
+Outputs:
+  FunctionName:
+    Description: 'Lambda function name'
+    Value: !Ref DomainMonitorFunction
+    Export:
+      Name: !Sub '${AWS::StackName}-FunctionName'
+  
+  FunctionArn:
+    Description: 'Lambda function ARN'
+    Value: !GetAtt DomainMonitorFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-FunctionArn'
+  
+  ScheduleRule:
+    Description: 'EventBridge rule ARN'
+    Value: !GetAtt DomainScheduleRule.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-ScheduleRuleArn'
+  
+  MonitoredDomain:
+    Description: 'Domain being monitored'
+    Value: !Ref DomainToMonitor
+  
+  InvokeLambda:
+    Description: 'Target invoke handler Lambda'
+    Value: !Ref InvokeLambdaName
+  
+  RoleArn:
+    Description: 'IAM role ARN for the monitor function'
+    Value: !GetAtt DomainMonitorRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-RoleArn'
