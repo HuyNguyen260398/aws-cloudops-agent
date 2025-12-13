@@ -87,3 +87,5 @@ Bedrock Model Invoke monitor setup on CloudWatch
 		Permissions Policy grants write access to CloudWatch Log Group
 
 		Bedrock logging configuration uses the role to write logs
+
+https://bosch.webhook.office.com/webhookb2/88068855-0aad-4ebc-bd2b-a96866c0fe4d@0ae51e19-07c8-4e4b-bb6d-648ee58410f4/IncomingWebhook/bad03592b02c40e7a5eae7b607a181cb/c92e3493-8f7d-44a8-9f87-35b1ecd5178e/V2iasvdXoAsv_QViNlkv2tfJX44vrAA9Eih-oGIqZwES81
