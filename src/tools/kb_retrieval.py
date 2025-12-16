@@ -5,7 +5,7 @@ Integrates Bedrock Knowledge Base retrieval capabilities
 import os
 import boto3
 from strands import tool
-from typing import Optional
+from typing import List, Dict, Any
 import utils.mylogger as mylogger
 
 logger = mylogger.get_logger()
@@ -21,7 +21,8 @@ logger = mylogger.get_logger()
 )
 def retrieve_from_knowledge_base(
     query: str,
-    max_results: int = 3
+    max_results: int = 3,
+    min_score: float = 0.4
 ) -> str:
     """
     Retrieve relevant documents from Bedrock Knowledge Base
@@ -65,19 +66,20 @@ def retrieve_from_knowledge_base(
 
         # Parse results
         retrieval_results = response.get('retrievalResults', [])
+        logger.info(f"✅ Found {len(retrieval_results)} relevant documents")
 
-        if not retrieval_results:
+        filtered_results = filter_results_by_score(retrieval_results, min_score)
+
+        if not filtered_results:
             logger.info("ℹ️ No documents found matching the query")
             return f"No relevant documents found for query: '{query}'"
 
-        logger.info(f"✅ Found {len(retrieval_results)} relevant documents")
-
         # Format results
         formatted_results = []
-        formatted_results.append(f"📚 Retrieved {len(retrieval_results)} documents for: '{query}'\n")
+        formatted_results.append(f"📚 Retrieved {len(filtered_results)} documents for: '{query}'\n")
         formatted_results.append("=" * 80)
 
-        for idx, result in enumerate(retrieval_results, 1):
+        for idx, result in enumerate(filtered_results, 1):
             content = result.get('content', {}).get('text', 'No content')
             score = result.get('score', 0)
             location = result.get('location', {})
@@ -109,6 +111,24 @@ def retrieve_from_knowledge_base(
         error_msg = f"❌ Knowledge Base retrieval failed: {str(e)}"
         logger.error(error_msg)
         return f"Error retrieving from Knowledge Base: {str(e)}"
+
+
+def filter_results_by_score(results: List[Dict[str, Any]], min_score: float) -> List[Dict[str, Any]]:
+    """
+    Filter results based on minimum score threshold.
+
+    This function takes the raw results from a knowledge base query and removes
+    any items that don't meet the minimum relevance score threshold.
+
+    Args:
+        results: List of retrieval results from Bedrock Knowledge Base
+        min_score: Minimum score threshold (0.0-1.0). Only results with scores
+            greater than or equal to this value will be returned.
+
+    Returns:
+        List of filtered results that meet or exceed the score threshold
+    """
+    return [result for result in results if result.get("score", 0.0) >= min_score]
 
 
 # Optional: Add a simplified version for quick lookups
