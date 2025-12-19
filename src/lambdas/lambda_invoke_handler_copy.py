@@ -536,7 +536,7 @@ def send_teams_workflow(
     payload = {
         "alertName": f"🚨 {service_type} Alert - {service_name}",
         "agentSummary": summary[:1000] if summary else "Analysis in progress",
-        "suggestions": f"View full analysis at: {s3_url}" if s3_url else "Analysis pending",
+        "suggestions": f"Suggestions are on development ...",
         "alertId": alert_id,
         "viewUrl": s3_url if s3_url else "",
         "executeUrl": full_execute_url
