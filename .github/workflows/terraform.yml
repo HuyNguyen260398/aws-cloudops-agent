@@ -268,7 +268,7 @@ jobs:
         cd ..
         awk -v kb="$KB_ID" '
           BEGIN { q = "\""}
-          /^  id: .*# Will be set by Terraform or manually after KB deployment/ {
+          /^  id: .*#/ {
             print "  id: " q kb q "  # Auto-updated by Terraform"
             next
           }
