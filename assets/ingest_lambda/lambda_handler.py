@@ -6,7 +6,7 @@ import json
 # Supports both direct invocation and S3 event triggers
 def lambda_handler(event, context):
     kb_id = os.environ.get('KNOWLEDGE_BASE_ID')
-    region = os.environ.get('REGION')
+    region = os.environ.get('BEDROCK_REGION', "ap-southeast-2")
 
     if not kb_id:
         return {
