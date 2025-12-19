@@ -291,21 +291,41 @@ jobs:
         if git diff --quiet config/static-config.yaml; then
           echo "No changes to KB ID in config file"
         else
-          # Pull latest changes first to avoid conflicts
-          git pull --rebase origin ${{ github.ref_name }} || true
+          # Stash any other changes to focus only on config file
+          git stash push -u -m "Temporary stash" -- . ':!config/static-config.yaml' || true
 
           git add config/static-config.yaml
           git commit -m "Update KB ID to $(cd modules && terraform output -raw knowledge_base_id) [skip ci]"
 
-          # Push with retry in case of race condition
+          # Push with retry and conflict resolution
           for i in 1 2 3; do
             if git push; then
               echo "KB ID changes committed and pushed"
               exit 0
             fi
+
             echo "Push failed, pulling and retrying... (attempt $i/3)"
-            git pull --rebase origin ${{ github.ref_name }}
+
+            # Fetch latest changes
+            git fetch origin ${{ github.ref_name }}
+
+            # Try to rebase, if conflicts occur, resolve by using our version
+            if ! git rebase origin/${{ github.ref_name }}; then
+              echo "Rebase conflict detected, resolving by using our KB ID update..."
+
+              # Accept our version of the config file (the new KB ID)
+              git checkout --ours config/static-config.yaml
+              git add config/static-config.yaml
+              git rebase --continue || {
+                echo "Rebase failed, aborting and trying merge strategy..."
+                git rebase --abort
+
+                # Use merge strategy instead, preferring our changes
+                git merge -X ours origin/${{ github.ref_name }} -m "Merge with updated KB ID"
+              }
+            fi
           done
+
           echo "Failed to push after 3 attempts"
           exit 1
         fi
