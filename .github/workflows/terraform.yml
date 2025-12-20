@@ -268,7 +268,7 @@ jobs:
         cd ..
         awk -v kb="$KB_ID" '
           BEGIN { q = "\""}
-          /^  id: .*# Will be set by Terraform or manually after KB deployment/ {
+          /^  id: .*#/ {
             print "  id: " q kb q "  # Auto-updated by Terraform"
             next
           }
@@ -291,10 +291,44 @@ jobs:
         if git diff --quiet config/static-config.yaml; then
           echo "No changes to KB ID in config file"
         else
+          # Stash any other changes to focus only on config file
+          # IMPORTANT: Don't stash terraform state files - they're needed for backup step
+          git stash push -u -m "Temporary stash" -- . ':!config/static-config.yaml' ':!modules/terraform.tfstate*' || true
+
           git add config/static-config.yaml
           git commit -m "Update KB ID to $(cd modules && terraform output -raw knowledge_base_id) [skip ci]"
-          git push
-          echo "KB ID changes committed and pushed"
+
+          # Push with retry and conflict resolution
+          for i in 1 2 3; do
+            if git push; then
+              echo "KB ID changes committed and pushed"
+              exit 0
+            fi
+
+            echo "Push failed, pulling and retrying... (attempt $i/3)"
+
+            # Fetch latest changes
+            git fetch origin ${{ github.ref_name }}
+
+            # Try to rebase, if conflicts occur, resolve by using our version
+            if ! git rebase origin/${{ github.ref_name }}; then
+              echo "Rebase conflict detected, resolving by using our KB ID update..."
+
+              # Accept our version of the config file (the new KB ID)
+              git checkout --ours config/static-config.yaml
+              git add config/static-config.yaml
+              git rebase --continue || {
+                echo "Rebase failed, aborting and trying merge strategy..."
+                git rebase --abort
+
+                # Use merge strategy instead, preferring our changes
+                git merge -X ours origin/${{ github.ref_name }} -m "Merge with updated KB ID"
+              }
+            fi
+          done
+
+          echo "Failed to push after 3 attempts"
+          exit 1
         fi
       env:
         AWS_REGION: ${{ vars.AWS_REGION }}
@@ -310,3 +344,4 @@ jobs:
       env:
         AWS_REGION: ap-southeast-1
         NODE_TLS_REJECT_UNAUTHORIZED: '0'
+        

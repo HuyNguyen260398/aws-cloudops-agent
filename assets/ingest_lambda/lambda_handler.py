@@ -6,7 +6,7 @@ import json
 # Supports both direct invocation and S3 event triggers
 def lambda_handler(event, context):
     kb_id = os.environ.get('KNOWLEDGE_BASE_ID')
-    region = os.environ.get('REGION')
+    region = os.environ.get('BEDROCK_REGION', "ap-southeast-2")
 
     if not kb_id:
         return {
@@ -31,16 +31,24 @@ def lambda_handler(event, context):
                 uploaded_files.append(f"s3://{bucket}/{key}")
         print(f"Triggered by S3 upload: {uploaded_files}")
 
-    client = boto3.client('bedrock-agent', region_name=region)
+
 
     try:
+        client = boto3.client('bedrock-agent', region_name=region)
+        print("Bedrock client created successfully")
+        
         # Get the first Data Source from the Knowledge Base
-        data_sources = client.list_data_sources(knowledgeBaseId=kb_id)
+        print(f"Listing data sources for KB: {kb_id}")
+        try:
+            data_sources = client.list_data_sources(knowledgeBaseId=kb_id)
+            print(f"Found {len(data_sources['dataSourceSummaries'])} data sources")
+        except Exception as e:
+            print(f"ERROR calling list_data_sources: {str(e)}")
+            print(f"Error type: {type(e).__name__}")
+            raise e
         if not data_sources['dataSourceSummaries']:
-            return {
-                'statusCode': 404,
-                'body': json.dumps({'error': 'Data Source not found.'})
-            }
+            print("ERROR: No data sources found for Knowledge Base")
+            raise Exception("No data sources found for Knowledge Base")
 
         data_source_id = data_sources['dataSourceSummaries'][0]['dataSourceId']
 
@@ -65,11 +73,12 @@ def lambda_handler(event, context):
         }
     except Exception as e:
         print(f"Error starting ingestion: {str(e)}")
-        return {
-            'statusCode': 500,
-            'body': json.dumps({
-                'error': str(e),
-                'triggerSource': trigger_source,
-                'uploadedFiles': uploaded_files if uploaded_files else 'N/A'
-            })
-        }
+        raise e
+        # return {
+        #     'statusCode': 500,
+        #     'body': json.dumps({
+        #         'error': str(e),
+        #         'triggerSource': trigger_source,
+        #         'uploadedFiles': uploaded_files if uploaded_files else 'N/A'
+        #     })
+        # }

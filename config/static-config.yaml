@@ -8,7 +8,7 @@ aws:
 
 # Model Settings (used by agents via get_model_settings())
 agents:
-  modelid: "apac.anthropic.claude-sonnet-4-20250514-v1:0"
+  modelid: "global.anthropic.claude-haiku-4-5-20251001-v1:0"
   max_concurrent: 2
   payload_formats:
     diy: "direct"
@@ -87,7 +87,7 @@ memory:
 
 # Knowledge Base Settings (used by deployment scripts and KB retrieval tools)
 knowledge_base:
-  id: "PUNV7VSZKE"  # Auto-updated by Terraform
+  id: "JFVW5SM33P"  # Auto-updated by Terraform
   region: "ap-southeast-2"
 
 # Deployment Settings (used by deployment scripts) 

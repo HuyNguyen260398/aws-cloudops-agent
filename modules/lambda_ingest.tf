@@ -9,7 +9,7 @@ data "archive_file" "lambda_ingest_zip" {
 }
 
 resource "aws_lambda_function" "ingest" {
-  provider = aws.bedrock  # Deploy to ap-southeast-2 (same as S3 Documents and Knowledge Base)
+  provider = aws.bedrock # Deploy to ap-southeast-2 (same as S3 Documents and Knowledge Base)
 
   function_name = "${var.project}-ingest"
   role          = aws_iam_role.lambda_exec.arn
@@ -25,7 +25,7 @@ resource "aws_lambda_function" "ingest" {
   environment {
     variables = {
       KNOWLEDGE_BASE_ID = aws_bedrockagent_knowledge_base.kb.id
-      REGION            = var.bedrock_region
+      BEDROCK_REGION    = var.bedrock_region
     }
   }
 }
