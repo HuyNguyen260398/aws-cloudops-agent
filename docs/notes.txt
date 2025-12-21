@@ -87,3 +87,5 @@ Bedrock Model Invoke monitor setup on CloudWatch
 		Permissions Policy grants write access to CloudWatch Log Group
 
 		Bedrock logging configuration uses the role to write logs
+
+https://www.cloudthat.com/resources/blog/comparing-claude-45-haiku-and-sonnet-for-aws-ai-and-data-workloads
