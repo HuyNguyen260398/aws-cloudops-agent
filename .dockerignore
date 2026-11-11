@@ -1,0 +1,14 @@
+.git
+.github
+.venv
+.superpowers
+legacy
+docs
+tests
+infra
+scripts
+**/__pycache__
+.env
+*.md
+# pyproject.toml declares readme = "README.md"; the build needs it
+!README.md
