@@ -1,0 +1,9 @@
+# Copy to terraform.tfvars (git-ignored) for manual applies. CI passes these with -var.
+region             = "ap-southeast-1"
+environment        = "prod"
+ecr_repository_url = "<ACCOUNT_ID>.dkr.ecr.ap-southeast-1.amazonaws.com/cloudops-agent"
+ecr_repository_arn = "arn:aws:ecr:ap-southeast-1:<ACCOUNT_ID>:repository/cloudops-agent"
+image_tag          = "<git-sha>"
+# model_id               = "global.anthropic.claude-sonnet-5-5"
+# agent_read_policy_arns = ["arn:aws:iam::aws:policy/ReadOnlyAccess"]
+# log_level              = "INFO"

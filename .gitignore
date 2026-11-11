@@ -22,3 +22,4 @@ config/*.env
 *.tfstate*
 *.tfvars
 !*.tfvars.example
+backend.hcl

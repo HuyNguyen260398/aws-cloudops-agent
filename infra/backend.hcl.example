@@ -1,0 +1,6 @@
+# Copy to backend.hcl and run: terraform -chdir=infra init -backend-config=backend.hcl
+bucket       = "your-org-cloudops-agent-tfstate" # bootstrap output state_bucket_name
+key          = "cloudops-agent/prod.tfstate"
+region       = "ap-southeast-1"
+use_lockfile = true
+encrypt      = true
