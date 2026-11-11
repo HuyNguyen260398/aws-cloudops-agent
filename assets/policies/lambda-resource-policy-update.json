@@ -1,0 +1,37 @@
+{
+    "Version": "2012-10-17",
+    "Id": "default",
+    "Statement": [
+        {
+            "Sid": "AllowS3Invoke",
+            "Effect": "Allow",
+            "Principal": {
+                "Service": "s3.amazonaws.com"
+            },
+            "Action": "lambda:InvokeFunction",
+            "Resource": "arn:aws:lambda:ap-southeast-2:010382427026:function:rag-agent-system-ingest",
+            "Condition": {
+                "StringEquals": {
+                    "AWS:SourceAccount": "010382427026"
+                },
+                "ArnLike": {
+                    "AWS:SourceArn": "arn:aws:s3:::rag-agent-system-documents-ap-southeast-2-010382427026"
+                }
+            }
+        },
+        {
+            "Sid": "AllowAgentRuntimeUpdate",
+            "Effect": "Allow",
+            "Principal": {
+                "AWS": "arn:aws:iam::010382427026:role/AgentRuntimeRole"
+            },
+            "Action": [
+                "lambda:UpdateFunctionConfiguration",
+                "lambda:UpdateFunctionCode",
+                "lambda:GetFunction",
+                "lambda:GetFunctionConfiguration"
+            ],
+            "Resource": "arn:aws:lambda:ap-southeast-2:010382427026:function:rag-agent-system-ingest"
+        }
+    ]
+}

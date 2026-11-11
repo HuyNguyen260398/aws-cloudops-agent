@@ -1,0 +1,31 @@
+default_agent: 
+agents:
+  agent_streaming:
+    name: null
+    entrypoint: null
+    platform: linux/arm64
+    container_runtime: docker
+    aws:
+      execution_role: null
+      execution_role_auto_create: true
+      account: null
+      region: null
+      ecr_repository: null
+      ecr_auto_create: false
+      network_configuration:
+        network_mode: PUBLIC
+      protocol_configuration: 
+        server_protocol: HTTP
+      observability:
+        enabled: true
+    bedrock_agentcore:
+      agent_id: null
+      agent_arn: null
+      agent_session_id: null
+    codebuild:
+      project_name: null
+      execution_role: null
+      source_bucket: null
+    authorizer_configuration: null
+    request_header_configuration: null
+    oauth_configuration: null

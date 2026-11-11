@@ -1,0 +1,151 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Lambda function to monitor nghuy.link domain with AI agent analysis and multi-channel notifications'
+
+Parameters:
+  TeamsWebhookUrl:
+    Type: String
+    Description: 'Microsoft Teams webhook URL for notifications'
+    Default: ''
+    NoEcho: true
+  
+  SlackWebhookUrl:
+    Type: String
+    Description: 'Slack webhook URL for notifications'
+    Default: ''
+    NoEcho: true
+  
+  AgentRuntimeArn:
+    Type: String
+    Description: 'AWS Bedrock Agent Runtime ARN for analysis'
+    Default: 'arn:aws:bedrock-agentcore:ap-southeast-1:010382427026:runtime/aws_cloudops_agent-t6rEDA5h0K'
+  
+  CognitoUsername:
+    Type: String
+    Description: 'Cognito username for agent authentication'
+    Default: 'ted8hc'
+  
+  CognitoPassword:
+    Type: String
+    Description: 'Cognito password for agent authentication'
+    Default: ''
+    NoEcho: true
+  
+  CognitoClientId:
+    Type: String
+    Description: 'Cognito client ID for agent authentication'
+    Default: '40ede8sr0l0bs37hps0lbgvr8p'
+  
+  LambdaDeploymentBucket:
+    Type: String
+    Description: 'S3 bucket containing the Lambda deployment package'
+    Default: ''
+  
+  LambdaDeploymentKey:
+    Type: String
+    Description: 'S3 key for the Lambda deployment package'
+    Default: 'ping-monitor/lambda_ping_monitor.zip'
+
+Resources:
+  DomainAlertsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: domain-alerts
+      Subscription:
+        - Protocol: email
+          Endpoint: huynguyen260398@gmail.com
+
+  PingMonitorRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: PublishToSNS
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: sns:Publish
+                Resource: !Ref DomainAlertsTopic
+        - PolicyName: CognitoAuthentication
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cognito-idp:InitiateAuth
+                  - cognito-idp:GetUser
+                Resource: '*'
+        - PolicyName: BedrockAgentCoreInvoke
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeAgent
+                  - bedrock-agentcore:InvokeRuntime
+                Resource: '*'
+
+  PingMonitorFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: domain-ping-monitor
+      Runtime: python3.11
+      Handler: lambda_ping_monitor.lambda_handler
+      Role: !GetAtt PingMonitorRole.Arn
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN: !Ref DomainAlertsTopic
+          TEAMS_WEBHOOK_URL: !Ref TeamsWebhookUrl
+          SLACK_WEBHOOK_URL: !Ref SlackWebhookUrl
+          AGENT_RUNTIME_ARN: !Ref AgentRuntimeArn
+          COGNITO_USERNAME: !Ref CognitoUsername
+          COGNITO_PASSWORD: !Ref CognitoPassword
+          COGNITO_CLIENT_ID: !Ref CognitoClientId
+      Code:
+        S3Bucket: !Ref LambdaDeploymentBucket
+        S3Key: !Ref LambdaDeploymentKey
+      Timeout: 90
+      MemorySize: 256
+
+  PingScheduleRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: 'Trigger ping monitor every 30 minutes'
+      ScheduleExpression: 'rate(30 minutes)'
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt PingMonitorFunction.Arn
+          Id: PingMonitorTarget
+
+  PingSchedulePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref PingMonitorFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt PingScheduleRule.Arn
+
+Outputs:
+  FunctionName:
+    Description: 'Lambda function name'
+    Value: !Ref PingMonitorFunction
+  
+  FunctionArn:
+    Description: 'Lambda function ARN'
+    Value: !GetAtt PingMonitorFunction.Arn
+  
+  ScheduleRule:
+    Description: 'EventBridge rule ARN'
+    Value: !GetAtt PingScheduleRule.Arn
+  
+  SNSTopicArn:
+    Description: 'SNS topic ARN for domain alerts'
+    Value: !Ref DomainAlertsTopic

@@ -1,0 +1,357 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Enhanced Ping Monitor with Slack Approval Workflow - Monitors domain availability and sends alerts with interactive approval buttons'
+
+Parameters:
+  DomainName:
+    Type: String
+    Default: 'nghuy.link'
+    Description: Domain name to monitor
+  
+  SNSEmailAddress:
+    Type: String
+    Description: Email address for SNS notifications
+    Default: 'your-email@example.com'
+  
+  SlackWebhookURL:
+    Type: String
+    Description: Slack webhook URL for notifications
+    NoEcho: true
+  
+  SlackSigningSecret:
+    Type: String
+    Description: Slack app signing secret for verifying requests
+    NoEcho: true
+  
+  TeamsWebhookURL:
+    Type: String
+    Description: Microsoft Teams webhook URL (optional)
+    Default: ''
+    NoEcho: true
+  
+  CloudFrontDistributionId:
+    Type: String
+    Description: CloudFront distribution ID for cache invalidation (optional)
+    Default: ''
+  
+  AgentRuntimeArn:
+    Type: String
+    Description: AWS Bedrock Agent Runtime ARN
+    Default: ''
+  
+  CognitoUsername:
+    Type: String
+    Description: Cognito username for agent authentication
+    Default: ''
+  
+  CognitoPassword:
+    Type: String
+    Description: Cognito password for agent authentication
+    NoEcho: true
+    Default: ''
+  
+  CognitoClientId:
+    Type: String
+    Description: Cognito client ID
+    Default: ''
+  
+  MonitoringSchedule:
+    Type: String
+    Default: 'rate(5 minutes)'
+    Description: CloudWatch Events schedule expression
+
+Resources:
+  # DynamoDB Table for Alert Data
+  AlertsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${AWS::StackName}-alerts'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: alert_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: alert_id
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-alerts-table'
+        - Key: Purpose
+          Value: Store alert data for approval workflow
+
+  # SNS Topic for Email Notifications
+  AlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub '${AWS::StackName}-alerts'
+      DisplayName: Domain Monitor Alerts
+      Subscription:
+        - Endpoint: !Ref SNSEmailAddress
+          Protocol: email
+
+  # SNS Topic for Remediation Notifications
+  RemediationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub '${AWS::StackName}-remediation'
+      DisplayName: Domain Monitor Remediation Actions
+
+  # IAM Role for Ping Monitor Lambda
+  PingMonitorLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${AWS::StackName}-ping-monitor-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Policies:
+        - PolicyName: PingMonitorPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'sns:Publish'
+                Resource:
+                  - !Ref AlertTopic
+              - Effect: Allow
+                Action:
+                  - 'dynamodb:PutItem'
+                  - 'dynamodb:GetItem'
+                  - 'dynamodb:UpdateItem'
+                Resource:
+                  - !GetAtt AlertsTable.Arn
+              - Effect: Allow
+                Action:
+                  - 'cognito-idp:InitiateAuth'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'bedrock:InvokeAgent'
+                  - 'bedrock:InvokeModel'
+                Resource: '*'
+
+  # IAM Role for Approval Handler Lambda
+  ApprovalHandlerLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${AWS::StackName}-approval-handler-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Policies:
+        - PolicyName: ApprovalHandlerPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'dynamodb:GetItem'
+                  - 'dynamodb:UpdateItem'
+                Resource:
+                  - !GetAtt AlertsTable.Arn
+              - Effect: Allow
+                Action:
+                  - 'sns:Publish'
+                Resource:
+                  - !Ref RemediationTopic
+              - Effect: Allow
+                Action:
+                  - 'cloudfront:CreateInvalidation'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'route53:GetHealthCheck'
+                  - 'route53:GetHealthCheckStatus'
+                  - 'route53:UpdateHealthCheck'
+                Resource: '*'
+
+  # Ping Monitor Lambda Function
+  PingMonitorFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-ping-monitor'
+      Runtime: python3.11
+      Handler: lambda_ping_monitor.lambda_handler
+      Role: !GetAtt PingMonitorLambdaRole.Arn
+      Timeout: 60
+      MemorySize: 256
+      Code:
+        ZipFile: |
+          # Placeholder code - deploy actual code separately
+          def lambda_handler(event, context):
+              return {'statusCode': 200, 'body': 'Deploy actual code'}
+      Environment:
+        Variables:
+          DOMAIN_NAME: !Ref DomainName
+          SNS_TOPIC_ARN: !Ref AlertTopic
+          SLACK_WEBHOOK_URL: !Ref SlackWebhookURL
+          TEAMS_WEBHOOK_URL: !Ref TeamsWebhookURL
+          AGENT_RUNTIME_ARN: !Ref AgentRuntimeArn
+          COGNITO_USERNAME: !Ref CognitoUsername
+          COGNITO_PASSWORD: !Ref CognitoPassword
+          COGNITO_CLIENT_ID: !Ref CognitoClientId
+          DYNAMODB_ALERTS_TABLE: !Ref AlertsTable
+          CLOUDFRONT_DISTRIBUTION_ID: !Ref CloudFrontDistributionId
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-ping-monitor'
+
+  # Approval Handler Lambda Function
+  ApprovalHandlerFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-approval-handler'
+      Runtime: python3.11
+      Handler: lambda_approval_handler.lambda_handler
+      Role: !GetAtt ApprovalHandlerLambdaRole.Arn
+      Timeout: 30
+      MemorySize: 256
+      Code:
+        ZipFile: |
+          # Placeholder code - deploy actual code separately
+          def lambda_handler(event, context):
+              return {'statusCode': 200, 'body': 'Deploy actual code'}
+      Environment:
+        Variables:
+          DYNAMODB_ALERTS_TABLE: !Ref AlertsTable
+          SLACK_SIGNING_SECRET: !Ref SlackSigningSecret
+          REMEDIATION_SNS_TOPIC_ARN: !Ref RemediationTopic
+          CLOUDFRONT_DISTRIBUTION_ID: !Ref CloudFrontDistributionId
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-approval-handler'
+
+  # CloudWatch Events Rule for Scheduled Monitoring
+  MonitoringScheduleRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub '${AWS::StackName}-monitoring-schedule'
+      Description: Trigger ping monitor at regular intervals
+      ScheduleExpression: !Ref MonitoringSchedule
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt PingMonitorFunction.Arn
+          Id: PingMonitorTarget
+
+  # Permission for CloudWatch Events to invoke Lambda
+  PingMonitorInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref PingMonitorFunction
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt MonitoringScheduleRule.Arn
+
+  # API Gateway for Slack Interactivity
+  ApprovalApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub '${AWS::StackName}-approval-api'
+      ProtocolType: HTTP
+      Description: API for handling Slack interactive button callbacks
+
+  # API Gateway Integration
+  ApprovalApiIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref ApprovalApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt ApprovalHandlerFunction.Arn
+      PayloadFormatVersion: '2.0'
+
+  # API Gateway Route
+  ApprovalApiRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref ApprovalApi
+      RouteKey: 'POST /slack/interactive'
+      Target: !Sub 'integrations/${ApprovalApiIntegration}'
+
+  # API Gateway Stage
+  ApprovalApiStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref ApprovalApi
+      StageName: '$default'
+      AutoDeploy: true
+
+  # Permission for API Gateway to invoke Lambda
+  ApprovalHandlerInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ApprovalHandlerFunction
+      Action: 'lambda:InvokeFunction'
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApprovalApi}/*/*/slack/interactive'
+
+  # CloudWatch Log Group for Ping Monitor
+  PingMonitorLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${PingMonitorFunction}'
+      RetentionInDays: 7
+
+  # CloudWatch Log Group for Approval Handler
+  ApprovalHandlerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${ApprovalHandlerFunction}'
+      RetentionInDays: 7
+
+Outputs:
+  PingMonitorFunctionArn:
+    Description: ARN of the Ping Monitor Lambda function
+    Value: !GetAtt PingMonitorFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-ping-monitor-arn'
+
+  ApprovalHandlerFunctionArn:
+    Description: ARN of the Approval Handler Lambda function
+    Value: !GetAtt ApprovalHandlerFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-approval-handler-arn'
+
+  AlertsTableName:
+    Description: Name of the DynamoDB alerts table
+    Value: !Ref AlertsTable
+    Export:
+      Name: !Sub '${AWS::StackName}-alerts-table'
+
+  SNSTopicArn:
+    Description: ARN of the SNS alert topic
+    Value: !Ref AlertTopic
+    Export:
+      Name: !Sub '${AWS::StackName}-sns-topic'
+
+  RemediationTopicArn:
+    Description: ARN of the SNS remediation topic
+    Value: !Ref RemediationTopic
+    Export:
+      Name: !Sub '${AWS::StackName}-remediation-topic'
+
+  ApprovalApiEndpoint:
+    Description: API Gateway endpoint for Slack interactivity (configure this in your Slack app)
+    Value: !Sub 'https://${ApprovalApi}.execute-api.${AWS::Region}.amazonaws.com/slack/interactive'
+    Export:
+      Name: !Sub '${AWS::StackName}-approval-api-endpoint'
+
+  ApprovalApiId:
+    Description: API Gateway ID
+    Value: !Ref ApprovalApi
+    Export:
+      Name: !Sub '${AWS::StackName}-approval-api-id'
