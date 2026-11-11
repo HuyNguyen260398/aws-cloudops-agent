@@ -4,7 +4,7 @@
 # AWS Settings (used by ALL deployment scripts and agents)
 aws:
   region: "ap-southeast-1"
-  account_id: "010382427026"
+  account_id: "<ACCOUNT_ID>"
 
 # Model Settings (used by agents via get_model_settings())
 agents:
@@ -55,7 +55,7 @@ container:
 # Runtime Base Settings (used by deployment scripts)
 runtime:
   name_prefix: "bac-runtime"
-  role_arn: "arn:aws:iam::010382427026:role/AgentRuntimeRole"
+  role_arn: "arn:aws:iam::<ACCOUNT_ID>:role/AgentRuntimeRole"
   p_agent:
     name: "aws_cloudops_agent"
   q_agent:

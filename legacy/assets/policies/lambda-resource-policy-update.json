@@ -9,13 +9,13 @@
                 "Service": "s3.amazonaws.com"
             },
             "Action": "lambda:InvokeFunction",
-            "Resource": "arn:aws:lambda:ap-southeast-2:010382427026:function:rag-agent-system-ingest",
+            "Resource": "arn:aws:lambda:ap-southeast-2:<ACCOUNT_ID>:function:rag-agent-system-ingest",
             "Condition": {
                 "StringEquals": {
-                    "AWS:SourceAccount": "010382427026"
+                    "AWS:SourceAccount": "<ACCOUNT_ID>"
                 },
                 "ArnLike": {
-                    "AWS:SourceArn": "arn:aws:s3:::rag-agent-system-documents-ap-southeast-2-010382427026"
+                    "AWS:SourceArn": "arn:aws:s3:::rag-agent-system-documents-ap-southeast-2-<ACCOUNT_ID>"
                 }
             }
         },
@@ -23,7 +23,7 @@
             "Sid": "AllowAgentRuntimeUpdate",
             "Effect": "Allow",
             "Principal": {
-                "AWS": "arn:aws:iam::010382427026:role/AgentRuntimeRole"
+                "AWS": "arn:aws:iam::<ACCOUNT_ID>:role/AgentRuntimeRole"
             },
             "Action": [
                 "lambda:UpdateFunctionConfiguration",
@@ -31,7 +31,7 @@
                 "lambda:GetFunction",
                 "lambda:GetFunctionConfiguration"
             ],
-            "Resource": "arn:aws:lambda:ap-southeast-2:010382427026:function:rag-agent-system-ingest"
+            "Resource": "arn:aws:lambda:ap-southeast-2:<ACCOUNT_ID>:function:rag-agent-system-ingest"
         }
     ]
 }

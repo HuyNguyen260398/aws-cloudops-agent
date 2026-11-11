@@ -17,7 +17,7 @@ Parameters:
   AgentRuntimeArn:
     Type: String
     Description: 'AWS Bedrock Agent Runtime ARN for analysis'
-    Default: 'arn:aws:bedrock-agentcore:ap-southeast-1:010382427026:runtime/aws_cloudops_agent-t6rEDA5h0K'
+    Default: 'arn:aws:bedrock-agentcore:ap-southeast-1:<ACCOUNT_ID>:runtime/aws_cloudops_agent-t6rEDA5h0K'
   
   CognitoUsername:
     Type: String

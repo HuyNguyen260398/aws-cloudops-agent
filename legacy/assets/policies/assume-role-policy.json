@@ -4,7 +4,7 @@
     {
       "Effect": "Allow",
       "Action": "sts:AssumeRole",
-      "Resource": "arn:aws:iam::010382427026:role/AgentRuntimeRole"
+      "Resource": "arn:aws:iam::<ACCOUNT_ID>:role/AgentRuntimeRole"
     }
   ]
 }

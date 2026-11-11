@@ -14,26 +14,19 @@ src_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(src_root)
 
 # Set environment variables for testing
-os.environ["SNS_TOPIC_ARN"] = "arn:aws:sns:ap-southeast-1:010382427026:domain-alerts"
-os.environ["TEAMS_WEBHOOK_URL"] = (
-    "https://bosch.webhook.office.com/webhookb2/88068855-0aad-4ebc-bd2b-a96866c0fe4d@0ae51e19-07c8-4e4b-bb6d-648ee58410f4/IncomingWebhook/bad03592b02c40e7a5eae7b607a181cb/c92e3493-8f7d-44a8-9f87-35b1ecd5178e/V2iasvdXoAsv_QViNlkv2tfJX44vrAA9Eih-oGIqZwES81"  # Add your Teams webhook URL here for testing
-)
-os.environ["SLACK_WEBHOOK_URL"] = ""
-os.environ["AGENT_RUNTIME_ARN"] = (
-    "arn:aws:bedrock-agentcore:ap-southeast-1:010382427026:runtime/aws_cloudops_agent-t6rEDA5h0K"
-)
-os.environ["COGNITO_USERNAME"] = "ted8hc"
-os.environ["COGNITO_PASSWORD"] = ""
-os.environ["COGNITO_CLIENT_ID"] = "40ede8sr0l0bs37hps0lbgvr8p"
-os.environ["AWS_REGION"] = "ap-southeast-1"
-os.environ["AWS_DEFAULT_REGION"] = "ap-southeast-1"
-os.environ["S3_ANALYSIS_BUCKET"] = (
-    "domain-alert-analysis"  # S3 bucket for storing full analysis reports
-)
-os.environ["DYNAMODB_ALERTS_TABLE"] = "alerts"  # DynamoDB table for alert tracking
-os.environ["APPROVAL_API_URL"] = (
-    "https://api.example.com/approval"  # API Gateway URL for approval workflow
-)
+# Values come from the developer's shell; never commit real endpoints or credentials.
+os.environ.setdefault("SNS_TOPIC_ARN", "")
+os.environ.setdefault("TEAMS_WEBHOOK_URL", "")
+os.environ.setdefault("SLACK_WEBHOOK_URL", "")
+os.environ.setdefault("AGENT_RUNTIME_ARN", "")
+os.environ.setdefault("COGNITO_USERNAME", "")
+os.environ.setdefault("COGNITO_PASSWORD", "")
+os.environ.setdefault("COGNITO_CLIENT_ID", "")
+os.environ.setdefault("AWS_REGION", "ap-southeast-1")
+os.environ.setdefault("AWS_DEFAULT_REGION", "ap-southeast-1")
+os.environ.setdefault("S3_ANALYSIS_BUCKET", "")  # S3 bucket for storing full analysis reports
+os.environ.setdefault("DYNAMODB_ALERTS_TABLE", "")  # DynamoDB table for alert tracking
+os.environ.setdefault("APPROVAL_API_URL", "")  # API Gateway URL for approval workflow
 
 # Import the lambda function
 from lambdas.lambda_invoke_handler import lambda_handler

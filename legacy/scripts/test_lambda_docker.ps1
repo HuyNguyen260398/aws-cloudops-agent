@@ -50,7 +50,7 @@ Resources:
       MemorySize: 256
       Environment:
         Variables:
-          SNS_TOPIC_ARN: $(if ($SkipSNS) { '' } else { 'arn:aws:sns:ap-southeast-1:010382427026:domain-alerts' })
+          SNS_TOPIC_ARN: $(if ($SkipSNS) { '' } else { 'arn:aws:sns:ap-southeast-1:<ACCOUNT_ID>:domain-alerts' })
           TEAMS_WEBHOOK_URL: $TeamsWebhook
           SLACK_WEBHOOK_URL: $SlackWebhook
           AGENT_RUNTIME_ARN: $AgentArn
@@ -86,7 +86,7 @@ Resources:
     
     # Build environment variables
     $envVars = @(
-        "-e", "SNS_TOPIC_ARN=$(if ($SkipSNS) { '' } else { 'arn:aws:sns:ap-southeast-1:010382427026:domain-alerts' })",
+        "-e", "SNS_TOPIC_ARN=$(if ($SkipSNS) { '' } else { 'arn:aws:sns:ap-southeast-1:<ACCOUNT_ID>:domain-alerts' })",
         "-e", "TEAMS_WEBHOOK_URL=$TeamsWebhook",
         "-e", "SLACK_WEBHOOK_URL=$SlackWebhook",
         "-e", "AGENT_RUNTIME_ARN=$AgentArn",

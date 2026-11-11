@@ -1,15 +1,10 @@
 Create OU for the team
 
-    AWS access portal URL: https://d-96675c542b.awsapps.com/start,
 	
-create access token
 
-	aws sts get-session-token --duration-seconds 7200
 	
 env vars
 
-	$env:AWS_ACCESS_KEY_ID=""
-	$env:AWS_SECRET_ACCESS_KEY=""
 	$env:AWS_REGION="ap-southeast-1"
 	
 deploy to AgentCore using docker
@@ -18,16 +13,15 @@ deploy to AgentCore using docker
 	docker buildx build --platform linux/arm64 -t my-agent:arm64 --load .
 	
 	# Local test with token
-	docker run --platform linux/arm64 -p 8080:8080 -e AWS_ACCESS_KEY_ID="" -e AWS_SECRET_ACCESS_KEY="" -e AWS_SESSION_TOKEN="" -e AWS_REGION="ap-southeast-1" my-agent:arm64
 	
 	# Create ECR repository
 	aws ecr create-repository --repository-name aws-cloudops-agent --region ap-southeast-1
 
 	# Login to ECR
-	aws ecr get-login-password --region ap-southeast-1 | docker login --username AWS --password-stdin 010382427026.dkr.ecr.ap-southeast-1.amazonaws.com/aws-cloudops-agent
+	aws ecr get-login-password --region ap-southeast-1 | docker login --username AWS --password-stdin <ACCOUNT_ID>.dkr.ecr.ap-southeast-1.amazonaws.com/aws-cloudops-agent
 
 	# Build and push to ECR
-	docker buildx build --platform linux/arm64 -t 010382427026.dkr.ecr.ap-southeast-1.amazonaws.com/aws-cloudops-agent:latest --push .
+	docker buildx build --platform linux/arm64 -t <ACCOUNT_ID>.dkr.ecr.ap-southeast-1.amazonaws.com/aws-cloudops-agent:latest --push .
 
 	# Verify the image
 	aws ecr describe-images --repository-name aws-cloudops-agent --region ap-southeast-1
@@ -48,11 +42,11 @@ AgentCore roles
 	
 		aws iam create-policy --policy-name AssumeAgentRuntimeRolePolicy --policy-document file://assume-role-policy.json --description "Policy to allow assuming the AgentRuntimeRole"
 		
-		aws iam attach-user-policy --user-name huy_ng --policy-arn arn:aws:iam::010382427026:policy/AssumeAgentRuntimeRolePolicy
+		aws iam attach-user-policy --user-name <USER_NAME> --policy-arn arn:aws:iam::<ACCOUNT_ID>:policy/AssumeAgentRuntimeRolePolicy
 		
-		aws iam list-attached-user-policies --user-name huy_ng
+		aws iam list-attached-user-policies --user-name <USER_NAME>
 		
-		aws sts assume-role --role-arn arn:aws:iam::010382427026:role/AgentRuntimeRole --role-session-name TestSession
+		aws sts assume-role --role-arn arn:aws:iam::<ACCOUNT_ID>:role/AgentRuntimeRole --role-session-name TestSession
 		
 	create role update
 	
@@ -76,7 +70,7 @@ Bedrock Model Invoke monitor setup on CloudWatch
 		
 	4. Attach Policy to Role
 	
-		aws iam attach-role-policy --role-name BedrockCloudWatchLogsRole --policy-arn arn:aws:iam::010382427026:policy/BedrockCloudWatchLogsPolicy
+		aws iam attach-role-policy --role-name BedrockCloudWatchLogsRole --policy-arn arn:aws:iam::<ACCOUNT_ID>:policy/BedrockCloudWatchLogsPolicy
 		
 	Connection Flow:
 

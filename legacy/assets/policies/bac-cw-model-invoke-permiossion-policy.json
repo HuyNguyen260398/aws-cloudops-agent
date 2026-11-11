@@ -7,7 +7,7 @@
         "logs:CreateLogStream",
         "logs:PutLogEvents"
       ],
-      "Resource": "arn:aws:logs:ap-southeast-1:010382427026:log-group::log-stream:aws/bedrock/modelinvocations"
+      "Resource": "arn:aws:logs:ap-southeast-1:<ACCOUNT_ID>:log-group::log-stream:aws/bedrock/modelinvocations"
     }
   ]
 }

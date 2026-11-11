@@ -9,7 +9,7 @@
                 "ecr:GetDownloadUrlForLayer"
             ],
             "Resource": [
-                "arn:aws:ecr:ap-southeast-2:010382427026:repository/*"
+                "arn:aws:ecr:ap-southeast-2:<ACCOUNT_ID>:repository/*"
             ]
         },
         {
@@ -19,7 +19,7 @@
                 "logs:CreateLogGroup"
             ],
             "Resource": [
-                "arn:aws:logs:ap-southeast-2:010382427026:log-group:/aws/bedrock-agentcore/runtimes/*"
+                "arn:aws:logs:ap-southeast-2:<ACCOUNT_ID>:log-group:/aws/bedrock-agentcore/runtimes/*"
             ]
         },
         {
@@ -28,7 +28,7 @@
                 "logs:DescribeLogGroups"
             ],
             "Resource": [
-                "arn:aws:logs:ap-southeast-2:010382427026:log-group:*"
+                "arn:aws:logs:ap-southeast-2:<ACCOUNT_ID>:log-group:*"
             ]
         },
         {
@@ -38,7 +38,7 @@
                 "logs:PutLogEvents"
             ],
             "Resource": [
-                "arn:aws:logs:ap-southeast-2:010382427026:log-group:/aws/bedrock-agentcore/runtimes/*:log-stream:*"
+                "arn:aws:logs:ap-southeast-2:<ACCOUNT_ID>:log-group:/aws/bedrock-agentcore/runtimes/*:log-stream:*"
             ]
         },
         {
@@ -80,8 +80,8 @@
                 "bedrock-agentcore:GetWorkloadAccessTokenForUserId"
             ],
             "Resource": [
-                "arn:aws:bedrock-agentcore:ap-southeast-2:010382427026:workload-identity-directory/default",
-                "arn:aws:bedrock-agentcore:ap-southeast-2:010382427026:workload-identity-directory/default/workload-identity/aws-cloudops-agent"
+                "arn:aws:bedrock-agentcore:ap-southeast-2:<ACCOUNT_ID>:workload-identity-directory/default",
+                "arn:aws:bedrock-agentcore:ap-southeast-2:<ACCOUNT_ID>:workload-identity-directory/default/workload-identity/aws-cloudops-agent"
             ]
         },
         {
@@ -93,7 +93,7 @@
             ],
             "Resource": [
                 "arn:aws:bedrock:*::foundation-model/*",
-                "arn:aws:bedrock:ap-southeast-2:010382427026:*"
+                "arn:aws:bedrock:ap-southeast-2:<ACCOUNT_ID>:*"
             ]
         }
     ]
