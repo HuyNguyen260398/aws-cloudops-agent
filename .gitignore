@@ -16,3 +16,9 @@ config/.env
 config/*.env
 # Superpowers plan-execution scratch
 .superpowers/
+
+# Terraform
+.terraform/
+*.tfstate*
+*.tfvars
+!*.tfvars.example
