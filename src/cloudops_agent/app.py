@@ -18,8 +18,10 @@ configure_logging(settings.log_level)
 logger = logging.getLogger(__name__)
 
 app = BedrockAgentCoreApp()
-# The SDK logger has its own JSON handler (with requestId); don't also emit through ours.
-app.logger.propagate = False
+# The SDK logger may install its own handler (with requestId); if it did, don't also emit
+# its records through our root handler.
+if any(isinstance(h, logging.StreamHandler) for h in app.logger.handlers):
+    app.logger.propagate = False
 
 INVALID_PROMPT_MSG = "Error: 'prompt' must be a non-empty string."
 INTERNAL_ERROR_MSG = "\n[error] The agent hit an internal error. Check the runtime logs."

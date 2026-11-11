@@ -1,4 +1,5 @@
 import json
+import logging
 from unittest.mock import MagicMock
 
 import pytest
@@ -134,8 +135,26 @@ def test_defaults_without_session_or_actor(client, fake_build):
     assert build.call_args.kwargs == {"session_id": None, "actor_id": "default"}
 
 
-def test_sdk_app_logs_are_not_duplicated_into_our_handler(capsys):
-    app_module.configure_logging("INFO")
-    app_module.app.logger.info("sdk-line-marker")
-    out = capsys.readouterr()
-    assert (out.out + out.err).count("sdk-line-marker") == 1
+def test_sdk_app_logs_are_emitted_exactly_once():
+    """SDK records go to the SDK's own stream handler or to root handlers, never both."""
+
+    class Recorder(logging.Handler):
+        def __init__(self):
+            super().__init__()
+            self.messages = []
+
+        def emit(self, record):
+            self.messages.append(record.getMessage())
+
+    recorder = Recorder()
+    root = logging.getLogger()
+    root.addHandler(recorder)
+    try:
+        app_module.app.logger.info("sdk-line-marker")
+    finally:
+        root.removeHandler(recorder)
+    sdk_has_own_stream = any(
+        isinstance(h, logging.StreamHandler) for h in app_module.app.logger.handlers
+    )
+    reached_root = "sdk-line-marker" in recorder.messages
+    assert reached_root is not sdk_has_own_stream
