@@ -23,3 +23,6 @@ config/*.env
 *.tfvars
 !*.tfvars.example
 backend.hcl
+
+# Local design specs and plans (Superpowers workflow)
+docs/superpowers/

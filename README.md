@@ -7,7 +7,23 @@ helps troubleshoot, and gives architecture and operations advice. It cannot chan
 This repo is the base for the DevOps team's AI-agents hackathon. New tool sets (Spacelift,
 Slack, …) plug into `src/cloudops_agent/tools/` without re-plumbing anything.
 
+**New to the repo?** Start with **[docs/ONBOARDING.md](docs/ONBOARDING.md)**. It has the
+component, request-flow, AWS architecture and CI/CD diagrams, plus a first-day checklist. It
+links to the detailed reference docs in [`docs/codebase/`](docs/codebase/).
+
 ## Architecture
+
+### Initial Architecture
+
+![AWS CloudOps Agent Architecture](docs/aws_agent.drawio.svg)
+
+> This is the original design diagram (source: `docs/aws_agent.drawio`). It also shows parts that
+> have since moved to [`legacy/`](legacy/README.md): the Cognito auth, the AgentCore Gateway, and
+> the Knowledge Base/RAG tools. The current runtime is the diagram below. A
+> current AWS diagram with official icons is in
+> [`docs/diagrams/aws-architecture.drawio`](docs/diagrams/aws-architecture.drawio).
+
+### Current Architecture
 
 ```mermaid
 flowchart LR
@@ -36,6 +52,45 @@ flowchart LR
 - AWS CLI v2 and credentials for the target account
 - Bedrock model access to the chosen Claude model in the region. On first use, Anthropic
   models may need a one-time Marketplace subscription by an account admin.
+
+## Project Structure
+
+```ini
+aws-cloudops-agent/
+├── src/cloudops_agent/                 # Agent package (the only code in the container image)
+│   ├── app.py                          # AgentCore entrypoint: validate payload, stream text (SSE)
+│   ├── agent.py                        # build_agent(): model, tools, prompt, memory, conversation mgr
+│   ├── config.py                       # Settings loaded from environment variables
+│   ├── prompts.py                      # System prompt (read-only rules)
+│   ├── logging_setup.py                # JSON-line logging to stdout
+│   └── tools/
+│       └── aws_read.py                 # Read-only boto3 tool (allow/deny, redact, truncate)
+├── scripts/
+│   └── invoke.py                       # Chat client: local server or deployed runtime
+├── tests/                              # pytest unit tests (no AWS calls)
+├── infra/                              # Terraform: AgentCore runtime, endpoint, memory, IAM, logs
+│   └── bootstrap/                      # Terraform (run once): state bucket, GitHub OIDC, deploy role, ECR
+├── .github/workflows/
+│   ├── ci.yml                          # Lint, test, Terraform checks, trivy, gitleaks, Docker build
+│   └── deploy.yml                      # OIDC deploy: push image, terraform apply (needs approval)
+├── docs/
+│   ├── ONBOARDING.md                   # Start here: diagrams + first-day checklist
+│   ├── codebase/                       # Reference docs: stack, structure, architecture, …
+│   ├── diagrams/                       # Current AWS architecture diagram (draw.io + PNG)
+│   ├── aws_agent.drawio(.svg/.png)     # Initial architecture diagram
+│   ├── aws-strands-agent.drawio(.svg)  # Initial agent diagram
+│   ├── AWS-CloudOps-Agent.pptx         # Presentation
+│   └── ROADMAP.md                      # Project roadmap
+├── legacy/                             # Previous implementation (unmaintained, not built or deployed)
+├── Dockerfile                          # arm64, non-root image for AgentCore Runtime
+├── pyproject.toml                      # Project config, dependencies, ruff/pytest settings
+├── uv.lock                             # Dependency lock file
+├── .env.example                        # Local configuration template
+├── .gitleaks.toml / .gitleaksignore    # Secret-scanning config
+├── .pre-commit-config.yaml             # gitleaks, ruff, terraform fmt hooks
+├── CLAUDE.md                           # Guidance for Claude Code
+└── README.md                           # This file
+```
 
 ## Local development
 
@@ -194,8 +249,7 @@ needed). **Never disable TLS verification** (`NODE_TLS_REJECT_UNAUTHORIZED=0`,
 
 ## Roadmap
 
-- **Spacelift plan-summary agent:** see
-  [`docs/superpowers/specs/2026-11-11-spacelift-plan-summary-agent-design.md`](docs/superpowers/specs/2026-11-11-spacelift-plan-summary-agent-design.md).
+- **Spacelift plan-summary agent:** parked; the design spec is kept outside the repo (ask the team).
 - Broader ideas: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 - The previous ping monitor, Slack/Teams approval Lambdas, KB/RAG and Cognito/Gateway code
   live in [`legacy/`](legacy/README.md), unmaintained.
