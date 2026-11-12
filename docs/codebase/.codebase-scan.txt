@@ -1,0 +1,417 @@
+
+=== DIRECTORY TREE (max depth 3, source files only) ===
+.dockerignore
+.env.example
+.github
+.github/workflows
+.github/workflows/ci.yml
+.github/workflows/deploy.yml
+.gitignore
+.gitleaks.toml
+.gitleaksignore
+.pre-commit-config.yaml
+.pytest_cache
+.pytest_cache/.gitignore
+.pytest_cache/CACHEDIR.TAG
+.pytest_cache/README.md
+.pytest_cache/v
+.pytest_cache/v/cache
+.pytest_cache/v/cache/lastfailed
+.pytest_cache/v/cache/nodeids
+.python-version
+.ruff_cache
+.ruff_cache/.gitignore
+.ruff_cache/0.17.4
+.ruff_cache/0.17.4/11925484072503655820
+.ruff_cache/0.17.4/12436881912911024955
+.ruff_cache/0.17.4/13242446313721130018
+.ruff_cache/0.17.4/15336040218298257958
+.ruff_cache/0.17.4/1750629306785092918
+.ruff_cache/0.17.4/1907784944847627423
+.ruff_cache/0.17.4/3793120159024493878
+.ruff_cache/0.17.4/589915033434721412
+.ruff_cache/0.17.4/8136767487770061438
+.ruff_cache/CACHEDIR.TAG
+CLAUDE.md
+Dockerfile
+README.md
+docs
+docs/AWS-CloudOps-Agent.pptx
+docs/ONBOARDING.md
+docs/ROADMAP.md
+docs/aws-strands-agent.drawio
+docs/aws-strands-agent.drawio.svg
+docs/aws_agent.drawio
+docs/aws_agent.drawio.png
+docs/aws_agent.drawio.svg
+docs/codebase
+docs/codebase/.codebase-scan.txt
+docs/codebase/ARCHITECTURE.md
+docs/codebase/CONCERNS.md
+docs/codebase/CONVENTIONS.md
+docs/codebase/INTEGRATIONS.md
+docs/codebase/STACK.md
+docs/codebase/STRUCTURE.md
+docs/codebase/TESTING.md
+docs/diagrams
+docs/diagrams/aws-architecture.drawio
+docs/diagrams/aws-architecture.png
+infra
+infra/.terraform
+infra/.terraform.lock.hcl
+infra/backend.hcl.example
+infra/bootstrap
+infra/bootstrap/.terraform
+infra/bootstrap/.terraform.lock.hcl
+infra/bootstrap/main.tf
+infra/bootstrap/outputs.tf
+infra/bootstrap/terraform.tfvars.example
+infra/bootstrap/variables.tf
+infra/bootstrap/versions.tf
+infra/iam.tf
+infra/memory.tf
+infra/outputs.tf
+infra/providers.tf
+infra/runtime.tf
+infra/terraform.tfvars.example
+infra/variables.tf
+infra/versions.tf
+legacy
+legacy/.agentcore.yaml
+legacy/.dockerignore
+legacy/.github
+legacy/.github/workflows
+legacy/.github/workflows/build.yml
+legacy/.github/workflows/terraform.yml
+legacy/README.md
+legacy/assets
+legacy/assets/calc
+legacy/assets/calc/calc-api.json
+legacy/assets/calc/lambda_function_code.py
+legacy/assets/calc/lambda_function_code.zip
+legacy/assets/ingest_lambda
+legacy/assets/ingest_lambda/lambda_handler.py
+legacy/assets/ingest_lambda/lambda_handler.zip
+legacy/assets/lambda_ping_monitor
+legacy/assets/lambda_ping_monitor/lambda_ping_monitor.zip
+legacy/assets/policies
+legacy/assets/policies/AgentRuntimeRole.json
+legacy/assets/policies/assume-role-policy.json
+legacy/assets/policies/bac-cw-model-invoke-permiossion-policy.json
+legacy/assets/policies/bac-cw-model-invoke-trust-relationship.json
+legacy/assets/policies/bedrock-marketplace-policy.json
+legacy/assets/policies/lambda-resource-policy-update.json
+legacy/assets/policies/simple-trust-policy.json
+legacy/assets/policies/trust-policy.json
+legacy/assets/rag_documents
+legacy/assets/rag_documents/rag.png
+legacy/assets/rag_documents/temp.pdf
+legacy/assets/rag_documents/test-lambda.txt
+legacy/assets/rag_documents/test-mlops.pdf
+legacy/assets/samples
+legacy/assets/samples/agent_response.txt
+legacy/assets/samples/output.json
+legacy/assets/samples/test-event.json
+legacy/cloudformation
+legacy/cloudformation/ping-monitor-with-approval.yaml
+legacy/cloudformation/ping-monitor.yaml
+legacy/config
+legacy/config/dynamic-config.yaml
+legacy/config/static-config.yaml
+legacy/dockerfile
+legacy/docs
+legacy/docs/AGENT_WORKFLOW_BEST_PRACTICES.md
+legacy/docs/COGNITO_AUTH_SETUP.md
+legacy/docs/DEPLOYMENT_COMMANDS.md
+legacy/docs/FEATURE_SLACK_APPROVAL.md
+legacy/docs/HANDLING_LONG_RESPONSES.md
+legacy/docs/JWT_INVOKE_ANALYSIS.md
+legacy/docs/LAMBDA_DEPLOYMENT_GUIDE.md
+legacy/docs/LAMBDA_PING_MONITOR.md
+legacy/docs/notes.txt
+legacy/modules
+legacy/modules/bucket.tf
+legacy/modules/iam_role.tf
+legacy/modules/knowledge_base.tf
+legacy/modules/lambda_ingest.tf
+legacy/modules/opensearch.tf
+legacy/modules/output.tf
+legacy/modules/s3_event_trigger.tf
+legacy/modules/variables.tf
+legacy/modules/version.tf
+legacy/scripts
+legacy/scripts/deploy-approval-workflow.ps1
+legacy/scripts/deploy-ping-monitor.ps1
+legacy/scripts/test_lambda_docker.ps1
+legacy/src
+legacy/src/__init__.py
+legacy/src/agent_runtime.py
+legacy/src/agents
+legacy/src/agents/__init__.py
+legacy/src/agents/aws_cloudops_agent.py
+legacy/src/components
+legacy/src/components/__init__.py
+legacy/src/components/auth.py
+legacy/src/components/conversation_manager.py
+legacy/src/components/gateway.py
+legacy/src/components/mcp.py
+legacy/src/components/memory.py
+legacy/src/lambdas
+legacy/src/lambdas/__init__.py
+legacy/src/lambdas/lambda-execute-deployment.zip
+legacy/src/lambdas/lambda_approval_handler.py
+legacy/src/lambdas/lambda_execution_handler.py
+legacy/src/lambdas/lambda_execution_handler_copy.py
+legacy/src/lambdas/lambda_invoke_handler.py
+legacy/src/lambdas/lambda_invoke_handler_copy.py
+legacy/src/lambdas/lambda_ping_monitor.py
+legacy/src/lambdas/upload_s3.sh
+legacy/src/lambdas/upload_s3_execute.sh
+legacy/src/ops
+legacy/src/ops/__init__.py
+legacy/src/ops/agent_client.py
+legacy/src/ops/deploy_memory.py
+legacy/src/ops/deploy_runtime.py
+legacy/src/ops/invoke_agent.py
+legacy/src/ops/invoke_agent_jwt.py
+legacy/src/tests
+legacy/src/tests/__init__.py
+legacy/src/tests/example_approval_workflow.py
+legacy/src/tests/test_kb_retrieval.py
+legacy/src/tests/test_lambda_domain_monitor_aws.py
+legacy/src/tests/test_lambda_local.py
+legacy/src/tools
+legacy/src/tools/__init__.py
+legacy/src/tools/kb_retrieval.py
+legacy/src/utils
+legacy/src/utils/__init__.py
+legacy/src/utils/config.py
+legacy/src/utils/config_manager.py
+legacy/src/utils/config_validator.py
+
+=== STACK DETECTION (manifest files) ===
+
+--- pyproject.toml ---
+[project]
+name = "cloudops-agent"
+version = "0.2.0"
+description = "Read-only AWS CloudOps agent on Amazon Bedrock AgentCore"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "strands-agents==1.64.0",
+    "bedrock-agentcore==1.26.0",
+    "boto3==1.44.0",
+    "aws-opentelemetry-distro==0.22.0",
+]
+
+[dependency-groups]
+dev = ["ruff", "pytest", "httpx"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cloudops_agent"]
+
+[tool.uv]
+package = true
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+extend-exclude = ["legacy", "docs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+--- uv.lock ---
+version = 1
+revision = 3
+requires-python = ">=3.13"
+resolution-markers = [
+    "python_full_version >= '3.14'",
+    "python_full_version < '3.14'",
+]
+
+[[package]]
+name = "annotated-types"
+version = "0.7.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/ee/67/531ea369ba64dcff5ec9c3402f9f51bf748cec26dde048a2f973a4eea7f5/annotated_types-0.7.0.tar.gz", hash = "sha256:aff07c09a53a08bc8cfccb9c85b05f1aa9a2a6f23728d790723543408344ce89", size = 16081, upload-time = "2024-05-20T21:33:25.928Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/78/b6/6307fbef88d9b5ee7421e68d78a9f162e0da4900bc5f5793f6d3d0e34fb8/annotated_types-0.7.0-py3-none-any.whl", hash = "sha256:1f02e8b43a8fbbc3f3e0d4f0f4bfc8131bcb4eebe8849b8e5c773f3a1c582a53", size = 13643, upload-time = "2024-05-20T21:33:24.1Z" },
+]
+
+[[package]]
+name = "anyio"
+version = "4.11.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "idna" },
+    { name = "sniffio" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c6/78/7d432127c41b50bccba979505f272c16cbcadcc33645d5fa3a738110ae75/anyio-4.11.0.tar.gz", hash = "sha256:82a8d0b81e318cc5ce71a5f1f8b5c4e63619620b63141ef8c995fa0db95a57c4", size = 219094, upload-time = "2025-09-23T09:19:12.58Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/15/b3/9b1a8074496371342ec1e796a96f99c82c945a339cd81a8e73de28b4cf9e/anyio-4.11.0-py3-none-any.whl", hash = "sha256:0287e96f4d26d4149305414d4e3bc32f0dcd0862365a4bddea19d7a1ec38c4fc", size = 109097, upload-time = "2025-09-23T09:19:10.601Z" },
+]
+
+[[package]]
+name = "asgiref"
+version = "3.13.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/6b/90/f5fce14e95fccf53b58e8e2c47cd84d40d105d64073ae1ac75166db150e0/asgiref-3.13.0.tar.gz", hash = "sha256:034cc8cbf72d00553b4be256703ac545120b4e50af13b49dec99da899aeeecb4", size = 52941, upload-time = "2026-10-23T08:13:14.715Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2e/b0/ec211e1f7966247cb6469158d856bac9aa4c2fe13621bd6a352e4f850453/asgiref-3.13.0-py3-none-any.whl", hash = "sha256:f9596a2434512686473d50f96ff6207fbba49ae1a785dfac614df4aeb085674d", size = 27593, upload-time = "2026-10-23T08:13:13.394Z" },
+]
+
+[[package]]
+name = "attrs"
+version = "25.3.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/5a/b0/1367933a8532ee6ff8d63537de4f1177af4bff9f3e829baf7331f595bb24/attrs-25.3.0.tar.gz", hash = "sha256:75d7cefc7fb576747b2c81b4442d4d4a1ce0900973527c011d1030fd3bf4af1b", size = 812032, upload-time = "2025-03-13T11:10:22.779Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/77/06/bb80f5f86020c4551da315d78b3ab75e8228f89f0162f2c3a819e407941a/attrs-25.3.0-py3-none-any.whl", hash = "sha256:427318ce031701fea540783410126f03899a97ffc6f61596ad581ac2e40e3bc3", size = 63815, upload-time = "2025-03-13T11:10:21.14Z" },
+]
+
+[[package]]
+name = "aws-opentelemetry-distro"
+version = "0.22.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cachetools" },
+    { name = "certifi" },
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-distro" },
+    { name = "opentelemetry-exporter-otlp-proto-common" },
+    { name = "opentelemetry-exporter-otlp-proto-grpc" },
+    { name = "opentelemetry-exporter-otlp-proto-http" },
+    { name = "opentelemetry-instrumentation" },
+    { name = "opentelemetry-instrumentation-aio-pika" },
+    { name = "opentelemetry-instrumentation-aiohttp-client" },
+    { name = "opentelemetry-instrumentation-aiokafka" },
+    { name = "opentelemetry-instrumentation-aiopg" },
+    { name = "opentelemetry-instrumentation-asgi" },
+    { name = "opentelemetry-instrumentation-asyncpg" },
+    { name = "opentelemetry-instrumentation-aws-lambda" },
+    { name = "opentelemetry-instrumentation-boto3sqs" },
+    { name = "opentelemetry-instrumentation-botocore" },
+    { name = "opentelemetry-instrumentation-cassandra" },
+    { name = "opentelemetry-instrumentation-celery" },
+    { name = "opentelemetry-instrumentation-confluent-kafka" },
+    { name = "opentelemetry-instrumentation-dbapi" },
+    { name = "opentelemetry-instrumentation-django" },
+    { name = "opentelemetry-instrumentation-falcon" },
+    { name = "opentelemetry-instrumentation-fastapi" },
+    { name = "opentelemetry-instrumentation-flask" },
+    { name = "opentelemetry-instrumentation-grpc" },
+    { name = "opentelemetry-instrumentation-httpx" },
+
+[TRUNCATED] Showing first 80 of 2140 lines.
+
+=== ENTRY POINTS ===
+No common entry points found. Check 'main' or 'scripts.start' in manifest files above.
+
+=== LINTING AND FORMATTING CONFIG ===
+No linting or formatting config files found in project root.
+
+=== ENVIRONMENT VARIABLE TEMPLATES ===
+--- .env.example ---
+# Copy to .env for local runs (`.env` is git-ignored). Never commit real IDs or credentials.
+MODEL_ID=global.anthropic.claude-sonnet-5-5
+# AgentCore Memory ID (optional; leave empty to run without conversation memory)
+MEMORY_ID=
+AWS_REGION=ap-southeast-1
+AWS_PROFILE=your-profile-name
+LOG_LEVEL=INFO
+
+
+=== TODO / FIXME / HACK (production code only, test dirs excluded) ===
+None found.
+
+=== GIT RECENT COMMITS (last 20) ===
+5662933 fix(security): scope deploy role IAM to runtime role; deny and redact secret reads
+bcfaefb docs: README, CLAUDE.md, roadmap for modernized agent
+67a23b2 ci: OIDC deploy pipeline, checks, and secret scanning
+1895802 feat(infra): AgentCore runtime, endpoint, memory, least-privilege IAM
+df20b24 feat(infra): bootstrap state bucket, GitHub OIDC deploy role, ECR
+10e31bb feat: arm64 non-root container image for AgentCore Runtime
+fbeccac feat: invoke/chat client for local and deployed runtime
+7a51d07 fix: emit AgentCore SDK logs once without dropping them
+ceff408 feat: BedrockAgentCoreApp entrypoint with payload validation and safe streaming
+9cda010 feat: agent factory with Bedrock model, memory session manager, time context
+2849781 feat: read-only aws_read tool with allow/deny rules and output truncation
+cffbe4e feat: new cloudops_agent package scaffold with typed settings
+05e1c27 chore: move legacy features to legacy/ and scrub committed secrets
+2b9c1cd Add CLAUDE.md and remove legacy files from old main
+71a95d4 Merge remote-tracking branch 'origin/feature/bgsv-main'
+5996200 Added draw.io diagram
+71a1f48 Added test_lambda_domain_monitor_aws.py
+3c5d069 Added image
+1643a48 Update README - agent architecture
+a1fc11a Update feature monitor lambda (#7)
+
+=== HIGH-CHURN FILES (last 90 days, top 20) ===
+   3 CLAUDE.md
+   3 .gitignore
+   2 README.md
+   2 infra/bootstrap/main.tf
+   2 infra/bootstrap/variables.tf
+   2 infra/iam.tf
+   2 src/cloudops_agent/tools/aws_read.py
+   2 tests/test_aws_read.py
+   2 src/cloudops_agent/app.py
+   2 tests/test_app.py
+   2 .env.example
+   1 tests/test_infra_policies.py
+   1 docs/ROADMAP.md
+   1 .github/workflows/ci.yml
+   1 .github/workflows/deploy.yml
+   1 .gitleaks.toml
+   1 .gitleaksignore
+   1 .pre-commit-config.yaml
+   1 infra/.terraform.lock.hcl
+   1 infra/backend.hcl.example
+
+=== MONOREPO SIGNALS ===
+No monorepo signals detected.
+
+=== CODE METRICS ===
+Total files scanned: 159
+Total lines of code: 14421
+
+Files by language:
+  Other: 104
+  Python: 55
+
+Top 10 largest files:
+legacy/assets/lambda_ping_monitor/lambda_ping_monitor.zip: 16472.6KB
+docs/aws_agent.drawio.svg: 8752.6KB
+docs/AWS-CloudOps-Agent.pptx: 6305.5KB
+docs/aws_agent.drawio.png: 4645.7KB
+docs/aws_agent.drawio: 4233.9KB
+legacy/assets/rag_documents/test-mlops.pdf: 2055.3KB
+docs/aws-strands-agent.drawio.svg: 602.8KB
+docs/diagrams/aws-architecture.png: 341.5KB
+
+=== CI/CD PIPELINES ===
+CI/CD: GitHub Actions
+
+=== CONTAINERS & ORCHESTRATION ===
+Container: Docker found
+
+=== SECURITY & COMPLIANCE ===
+No security configs detected.
+
+=== PERFORMANCE & TESTING ===
+No performance testing configs detected.
+
+=== SCAN COMPLETE ===

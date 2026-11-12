@@ -1,0 +1,4 @@
+title = "cloudops-agent gitleaks config"
+
+[extend]
+useDefault = true

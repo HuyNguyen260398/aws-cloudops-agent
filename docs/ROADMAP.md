@@ -1,5 +1,7 @@
 # 🚀 AWS CloudOps Agent - Infrastructure Management Roadmap
 
+> **Next up:** the Spacelift plan-summary agent (parked; the design spec is kept outside the repo).
+
 This document outlines planned enhancements to transform the AWS CloudOps Agent into a comprehensive infrastructure management solution.
 
 ## 🏗️ Infrastructure Management Enhancements
