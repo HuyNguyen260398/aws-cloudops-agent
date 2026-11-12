@@ -1,0 +1,7 @@
+# Historical findings only. All four are the same Microsoft Teams webhook, scrubbed from the
+# working tree in legacy/ and still present in git history; it must be rotated (see README).
+# Never add a current finding here: remove and rotate the secret instead.
+88b512ccd5313a1ac0f95f273d12c0839d147ea2:cloudformation/invoke-handler.yaml:microsoft-teams-webhook:35
+a1fc11acc0df8d0b24365c6b589abfbcd7f02713:src/tests/test_lambda_local.py:microsoft-teams-webhook:19
+118f9f12c0d34794ae7c55af2af41dda18a07b3e:docs/notes.txt:microsoft-teams-webhook:91
+ee67d6fddc4c69a3cbba9b923fee2ea3f69f7475:src/tests/test_lambda_local.py:microsoft-teams-webhook:18
