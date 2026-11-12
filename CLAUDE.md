@@ -54,8 +54,13 @@ The package is `src/cloudops_agent/`:
    the runtime itself needs.
 2. `aws_read` normalizes the operation to snake_case and lower case. It allows only the
    `describe_/list_/get_/lookup_/search_` prefixes and refuses `DENIED_OPERATIONS`, the reads
-   that return secrets or credentials. Both checks run before a boto3 client exists. The tool
-   strips `ResponseMetadata` and truncates its output.
+   that return secrets or credentials, plus `DENIED_SUBSTRINGS` such as "credentials" and
+   "password". Both checks run before a boto3 client exists. The tool redacts secret fields
+   (environment values, `ClientSecret`, passwords, `UserData`), strips `ResponseMetadata`, and
+   truncates its output.
+3. The runtime role in `infra/iam.tf` has an explicit `DenySecretAndDataReads`. The deploy role
+   may manage only `cloudops-agent-runtime`, attach only `runtime_read_policy_arns`, and pass
+   the role only to AgentCore. `tests/test_infra_policies.py` guards these rules.
 
 Do not add `strands-agents-tools`. Its `use_aws` blocks on stdin for consent, which hangs the
 server.

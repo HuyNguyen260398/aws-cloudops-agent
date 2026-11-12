@@ -24,3 +24,9 @@ variable "ecr_repository_name" {
   type        = string
   default     = "cloudops-agent"
 }
+
+variable "runtime_read_policy_arns" {
+  description = "Managed policies the deploy role may attach to the runtime role. Must include every ARN in infra's agent_read_policy_arns."
+  type        = list(string)
+  default     = ["arn:aws:iam::aws:policy/ReadOnlyAccess"]
+}

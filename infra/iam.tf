@@ -34,6 +34,39 @@ resource "aws_iam_role" "runtime" {
 }
 
 data "aws_iam_policy_document" "runtime" {
+  # 0. Explicit deny for reads that return secrets, credentials, or customer data, whatever
+  #    the attached read policies allow (ReadOnlyAccess grants several of them).
+  statement {
+    sid    = "DenySecretAndDataReads"
+    effect = "Deny"
+    actions = [
+      "s3:GetObject",
+      "s3:GetObjectVersion",
+      "s3:GetDataAccess",
+      "ssm:GetParameter",
+      "ssm:GetParameters",
+      "ssm:GetParametersByPath",
+      "ssm:GetParameterHistory",
+      "secretsmanager:GetSecretValue",
+      "secretsmanager:BatchGetSecretValue",
+      "lambda:GetFunction",
+      "dynamodb:GetItem",
+      "dynamodb:BatchGetItem",
+      "dynamodb:Query",
+      "dynamodb:Scan",
+      "kinesis:GetRecords",
+      "ec2:GetPasswordData",
+      "redshift:GetClusterCredentials",
+      "redshift:GetClusterCredentialsWithIAM",
+      "redshift-serverless:GetCredentials",
+      "glue:GetConnection",
+      "glue:GetConnections",
+      "lightsail:GetInstanceAccessDetails",
+      "lightsail:GetRelationalDatabaseMasterUserPassword",
+    ]
+    resources = ["*"]
+  }
+
   # 1. Invoke the chosen inference profile, and its underlying models only through that profile.
   statement {
     sid       = "InvokeInferenceProfile"

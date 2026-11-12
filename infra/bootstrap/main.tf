@@ -4,6 +4,9 @@ data "aws_partition" "current" {}
 locals {
   account_id = data.aws_caller_identity.current.account_id
   partition  = data.aws_partition.current.partition
+
+  # Must match aws_iam_role.runtime in infra/iam.tf.
+  runtime_role_arn = "arn:${local.partition}:iam::${local.account_id}:role/cloudops-agent-runtime"
 }
 
 # ---------------------------------------------------------------------------
@@ -189,20 +192,19 @@ data "aws_iam_policy_document" "deploy" {
     resources = ["arn:${local.partition}:bedrock-agentcore:${var.region}:${local.account_id}:*"]
   }
 
+  # Manage ONLY the runtime role. The deploy role's own name must never match these
+  # resources, or it could grant itself more permissions.
   statement {
-    sid = "AgentIamRoles"
+    sid = "RuntimeRole"
     actions = [
-      "iam:AttachRolePolicy",
       "iam:CreateRole",
       "iam:DeleteRole",
       "iam:DeleteRolePolicy",
-      "iam:DetachRolePolicy",
       "iam:GetRole",
       "iam:GetRolePolicy",
       "iam:ListAttachedRolePolicies",
       "iam:ListInstanceProfilesForRole",
       "iam:ListRolePolicies",
-      "iam:PassRole",
       "iam:PutRolePolicy",
       "iam:TagRole",
       "iam:UntagRole",
@@ -210,7 +212,32 @@ data "aws_iam_policy_document" "deploy" {
       "iam:UpdateRole",
       "iam:UpdateRoleDescription",
     ]
-    resources = ["arn:${local.partition}:iam::${local.account_id}:role/cloudops-agent-*"]
+    resources = [local.runtime_role_arn]
+  }
+
+  # Only the approved read policies may be attached to the runtime role.
+  statement {
+    sid       = "RuntimeRolePolicyAttachments"
+    actions   = ["iam:AttachRolePolicy", "iam:DetachRolePolicy"]
+    resources = [local.runtime_role_arn]
+
+    condition {
+      test     = "ArnEquals"
+      variable = "iam:PolicyARN"
+      values   = var.runtime_read_policy_arns
+    }
+  }
+
+  statement {
+    sid       = "PassRuntimeRole"
+    actions   = ["iam:PassRole"]
+    resources = [local.runtime_role_arn]
+
+    condition {
+      test     = "StringEquals"
+      variable = "iam:PassedToService"
+      values   = ["bedrock-agentcore.amazonaws.com"]
+    }
   }
 
   # AgentCore may create its service-linked role on first use.

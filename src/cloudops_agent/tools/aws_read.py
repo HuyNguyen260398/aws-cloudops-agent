@@ -1,8 +1,11 @@
 """`aws_read`: a read-only boto3 tool for the agent.
 
-Two layers keep the agent read-only. The runtime IAM role grants only read access, and this
-tool refuses every operation that is not a read before boto3 is called. Some reads return
-secrets or credentials; those are denied explicitly.
+Two layers keep the agent read-only. The runtime IAM role grants only read access (and
+explicitly denies the main secret and data-plane reads), and this tool refuses every operation
+that is not a read before boto3 is called. Reads that return secrets or credentials are denied
+by name or by pattern, and well-known secret fields (environment variables, client secrets,
+passwords, user data) are redacted from responses. A denylist cannot be complete, so IAM stays
+the authority; this tool is a second layer.
 """
 
 from __future__ import annotations
@@ -49,7 +52,56 @@ DENIED_OPERATIONS: frozenset[tuple[str, str]] = frozenset(
         ("lightsail", "get_instance_access_details"),
         ("lightsail", "get_relational_database_master_user_password"),
         ("lambda", "get_function"),  # response contains a presigned code URL
+        ("apigateway", "get_api_key"),
+        ("apigateway", "get_api_keys"),
+        ("appsync", "list_api_keys"),
+        ("dynamodb", "get_item"),
+        ("kinesis", "get_records"),
+        ("s3control", "get_data_access"),
+        ("gamelift", "get_compute_access"),
+        ("quicksight", "get_session_embed_url"),
     }
+)
+
+# Operation-name fragments that indicate credential or secret material in the response.
+DENIED_SUBSTRINGS = (
+    "credentials",
+    "password",
+    "auth_token",
+    "authorization_token",
+    "secret_value",
+    "session_token",
+    "federation_token",
+)
+
+# Response keys (case-insensitive) whose string values are always redacted.
+SECRET_KEYS = frozenset(
+    {
+        "clientsecret",
+        "secretstring",
+        "secretbinary",
+        "secretaccesskey",
+        "sessiontoken",
+        "privatekey",
+        "userdata",
+    }
+)
+REDACTED = "***redacted***"
+# Password-named keys that hold metadata, not secrets (e.g. IAM PasswordLastUsed).
+PASSWORD_METADATA_HINTS = (
+    "lastused",
+    "date",
+    "time",
+    "policy",
+    "required",
+    "reset",
+    "enabled",
+    "age",
+    "length",
+    "status",
+    "arn",
+    "id",
+    "version",
 )
 
 TRUNCATION_NOTE = "\n...[truncated: {shown} of {total} chars shown]"
@@ -67,9 +119,59 @@ def is_allowed_operation(service: str, operation: str) -> tuple[bool, str]:
             f"'{op}' is not a read operation. aws_read only allows operations starting with "
             f"{', '.join(ALLOWED_PREFIXES)}. This agent is read-only."
         )
-    if (svc, op) in DENIED_OPERATIONS:
+    if (svc, op) in DENIED_OPERATIONS or any(part in op for part in DENIED_SUBSTRINGS):
         return False, f"'{svc}.{op}' can return secrets or credentials and is blocked."
     return True, "ok"
+
+
+def _redact_environment(value: Any) -> Any:
+    """Keep variable names, drop values: {"K": "v"} and [{"name": "K", "value": "v"}] forms."""
+    if isinstance(value, dict):
+        if "Variables" in value and isinstance(value["Variables"], dict):
+            return {**value, "Variables": {k: REDACTED for k in value["Variables"]}}
+        if all(isinstance(v, str) for v in value.values()):
+            return {k: REDACTED for k in value}
+        return _redact(value)
+    if isinstance(value, list):
+        return [
+            {**item, "value": REDACTED} if isinstance(item, dict) and "value" in item else item
+            for item in value
+        ]
+    return value
+
+
+def _redact(value: Any) -> Any:
+    """Recursively redact secret-bearing fields from an AWS response."""
+    if isinstance(value, dict):
+        out = {}
+        for key, item in value.items():
+            lowered = str(key).lower()
+            if "environment" in lowered and isinstance(item, dict | list):
+                out[key] = _redact_environment(item)
+            elif lowered in SECRET_KEYS and item is not None:
+                out[key] = _redact_strings(item)
+            elif (
+                "password" in lowered
+                and isinstance(item, str | bytes)
+                and not any(hint in lowered for hint in PASSWORD_METADATA_HINTS)
+            ):
+                out[key] = REDACTED
+            else:
+                out[key] = _redact(item)
+        return out
+    if isinstance(value, list):
+        return [_redact(item) for item in value]
+    return value
+
+
+def _redact_strings(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {k: _redact_strings(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_redact_strings(v) for v in value]
+    if isinstance(value, str | bytes):
+        return REDACTED
+    return value
 
 
 def _truncate(text: str, limit: int) -> str:
@@ -125,7 +227,7 @@ def make_aws_read_tool(
             return f"AWS error: {exc}"
         response = dict(response or {})
         response.pop("ResponseMetadata", None)
-        text = json.dumps(response, default=str)
+        text = json.dumps(_redact(response), default=str)
         return _truncate(text, settings.max_tool_output_chars)
 
     return aws_read

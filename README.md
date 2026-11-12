@@ -157,9 +157,17 @@ On AgentCore, the runtime session header takes precedence over `session_id`.
   - The `aws_read` tool refuses anything that isn't `describe_*`, `list_*`, `get_*`, `lookup_*`
     or `search_*`, in any casing.
   - It also blocks reads that return secrets or credentials, such as
-    `secretsmanager:GetSecretValue`, `ssm:GetParameter*`, `s3:GetObject`, ECR/STS tokens, and
-    `lambda:GetFunction`.
-- **More access:** set `agent_read_policy_arns` to narrower or additional *read* policies.
+    `secretsmanager:GetSecretValue`, `ssm:GetParameter*`, `s3:GetObject`, DynamoDB items,
+    ECR/STS tokens, and `lambda:GetFunction`, plus any operation whose name mentions
+    credentials, passwords or tokens.
+  - It redacts environment-variable values, client secrets, passwords and EC2 user data from
+    responses.
+  - The runtime role also has an **explicit IAM Deny** for the main secret and data-plane
+    reads. A denylist can never be complete, so IAM is the authority. Use a policy narrower
+    than `ReadOnlyAccess` (for example `ViewOnlyAccess`) if the account holds sensitive data.
+- **More access:** set `agent_read_policy_arns` to narrower or additional *read* policies, and
+  add the same ARNs to the bootstrap's `runtime_read_policy_arns` first. The deploy role may
+  attach only those policies, and may manage only the `cloudops-agent-runtime` role.
   Granting write permissions does nothing on its own, because `aws_read` still refuses
   mutations. Mutating tools would need a deliberate design with human approval.
 - **Inbound auth** is IAM (SigV4) on `InvokeAgentRuntime`. There is no public endpoint.
